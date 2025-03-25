@@ -1,61 +1,38 @@
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
 
 class AppTheme {
-  static const Color primaryColor = Color(0xFF2B2D42);
-  static const Color secondaryColor = Color(0xFF8D99AE);
-  static const Color accentColor = Color(0xFFEF233C);
-  static const Color backgroundColor = Color(0xFFF8F9FA);
-  static const Color textColor = Color(0xFF2B2D42);
-  static const Color errorColor = Color(0xFFDC3545);
-  static const Color successColor = Color(0xFF28A745);
-
-  static ThemeData lightTheme = ThemeData(
-    useMaterial3: true,
-    colorScheme: ColorScheme.light(
-      primary: primaryColor,
-      secondary: secondaryColor,
-      surface: backgroundColor,
-      background: backgroundColor,
-      error: errorColor,
-    ),
-    textTheme: GoogleFonts.quicksandTextTheme(),
-    appBarTheme: const AppBarTheme(
-      backgroundColor: primaryColor,
-      foregroundColor: Colors.white,
-      elevation: 0,
-    ),
-    cardTheme: CardTheme(
-      elevation: 2,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
-      ),
-    ),
-    elevatedButtonTheme: ElevatedButtonThemeData(
-      style: ElevatedButton.styleFrom(
-        backgroundColor: accentColor,
-        foregroundColor: Colors.white,
-        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(8),
+  static const primaryColor = Color.fromARGB(255, 1, 166, 255);  // Azul principal
+  static const backgroundColor = Colors.white;
+  static const cardBackground = Color(0xFFF8F9FE);
+  
+  static ThemeData theme = ThemeData(
+    primaryColor: primaryColor,
+    scaffoldBackgroundColor: backgroundColor,
+    fontFamily: 'Quicksand',
+    
+    navigationBarTheme: NavigationBarThemeData(
+      backgroundColor: backgroundColor,
+      indicatorColor: const Color.fromARGB(255, 52, 37, 255).withOpacity(0.1),
+      labelTextStyle: MaterialStateProperty.all(
+        const TextStyle(
+          fontSize: 12,
+          fontWeight: FontWeight.w500,
+          fontFamily: 'Quicksand',
         ),
       ),
+      height: 65,
     ),
-    inputDecorationTheme: InputDecorationTheme(
-      border: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(8),
-        borderSide: const BorderSide(color: secondaryColor),
+    
+    appBarTheme: const AppBarTheme(
+      backgroundColor: backgroundColor,
+      elevation: 0,
+      centerTitle: true,
+      titleTextStyle: TextStyle(
+        color: Colors.black,
+        fontSize: 20,
+        fontWeight: FontWeight.w600,
+        fontFamily: 'Quicksand',
       ),
-      enabledBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(8),
-        borderSide: const BorderSide(color: secondaryColor),
-      ),
-      focusedBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(8),
-        borderSide: const BorderSide(color: accentColor),
-      ),
-      filled: true,
-      fillColor: Colors.white,
     ),
   );
 } 
