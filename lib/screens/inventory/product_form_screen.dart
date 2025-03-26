@@ -1,5 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'dart:io';
+import 'package:image_picker/image_picker.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:path/path.dart' as path;
 import 'package:ehstore_app/models/product.dart';
 import 'package:ehstore_app/services/product_service.dart';
 import 'package:ehstore_app/theme/app_theme.dart';
@@ -23,12 +27,15 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
   final _priceController = TextEditingController();
   final _currentStockController = TextEditingController();
   final _minStockController = TextEditingController();
-  final _imageController = TextEditingController();
   
   String _selectedCategory = 'electrónica';
   String _selectedSupplier = 'samsung';
   final Map<String, dynamic> _specifications = {};
+  
+  // Para las imágenes
   final List<String> _imageUrls = [];
+  final List<File> _imageFiles = [];
+  final ImagePicker _imagePicker = ImagePicker();
   
   bool _isLoading = false;
   bool _isEditing = false;
@@ -67,7 +74,24 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
       _selectedCategory = product.categoryId;
       _selectedSupplier = product.supplierId;
       _specifications.addAll(product.specifications);
-      _imageUrls.addAll(product.imageUrls);
+      
+      // Cargar las imágenes existentes
+      for (var url in product.imageUrls) {
+        if (url.startsWith('file://')) {
+          // Es una imagen local, intentar convertirla a un File
+          final path = url.replaceFirst('file://', '');
+          final file = File(path);
+          if (file.existsSync()) {
+            _imageFiles.add(file);
+          } else {
+            // Si el archivo no existe, tratar como URL
+            _imageUrls.add(url);
+          }
+        } else {
+          // Es una URL de red
+          _imageUrls.add(url);
+        }
+      }
     }
   }
 
@@ -78,7 +102,6 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
     _priceController.dispose();
     _currentStockController.dispose();
     _minStockController.dispose();
-    _imageController.dispose();
     super.dispose();
   }
 
@@ -169,6 +192,7 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
                           setState(() => _selectedCategory = value);
                         }
                       },
+                      dropdownColor: Colors.white, // Ajuste de color de fondo a blanco
                     ),
                     const SizedBox(height: 16),
 
@@ -191,6 +215,7 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
                           setState(() => _selectedSupplier = value);
                         }
                       },
+                      dropdownColor: Colors.white,
                     ),
                     const SizedBox(height: 24),
 
@@ -287,14 +312,33 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
                     const SizedBox(height: 16),
 
                     // Lista de imágenes
-                    if (_imageUrls.isNotEmpty)
+                    if (_imageFiles.isNotEmpty || _imageUrls.isNotEmpty)
                       Container(
                         height: 100,
                         margin: const EdgeInsets.only(bottom: 16),
                         child: ListView.builder(
                           scrollDirection: Axis.horizontal,
-                          itemCount: _imageUrls.length,
+                          itemCount: _imageFiles.length + _imageUrls.length,
                           itemBuilder: (context, index) {
+                            final bool isLocalImage = index < _imageFiles.length;
+                            final Widget imageWidget = isLocalImage
+                                ? Image.file(
+                                    _imageFiles[index],
+                                    fit: BoxFit.cover,
+                                  )
+                                : Image.network(
+                                    _imageUrls[index - _imageFiles.length],
+                                    fit: BoxFit.cover,
+                                    errorBuilder: (context, error, stackTrace) {
+                                      return const Center(
+                                        child: Icon(
+                                          Icons.broken_image_outlined,
+                                          color: Colors.grey,
+                                        ),
+                                      );
+                                    },
+                                  );
+                                
                             return Container(
                               width: 100,
                               margin: const EdgeInsets.only(right: 8),
@@ -307,18 +351,7 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
                                 children: [
                                   ClipRRect(
                                     borderRadius: BorderRadius.circular(8),
-                                    child: Image.network(
-                                      _imageUrls[index],
-                                      fit: BoxFit.cover,
-                                      errorBuilder: (context, error, stackTrace) {
-                                        return const Center(
-                                          child: Icon(
-                                            Icons.broken_image_outlined,
-                                            color: Colors.grey,
-                                          ),
-                                        );
-                                      },
-                                    ),
+                                    child: imageWidget,
                                   ),
                                   Positioned(
                                     top: 4,
@@ -326,7 +359,11 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
                                     child: GestureDetector(
                                       onTap: () {
                                         setState(() {
-                                          _imageUrls.removeAt(index);
+                                          if (isLocalImage) {
+                                            _imageFiles.removeAt(index);
+                                          } else {
+                                            _imageUrls.removeAt(index - _imageFiles.length);
+                                          }
                                         });
                                       },
                                       child: Container(
@@ -350,44 +387,19 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
                         ),
                       ),
 
-                    // Añadir imagen
-                    Row(
-                      children: [
-                        Expanded(
-                          child: TextFormField(
-                            controller: _imageController,
-                            decoration: const InputDecoration(
-                              labelText: 'URL de imagen',
-                              border: OutlineInputBorder(),
-                              prefixIcon: Icon(Icons.image_outlined),
-                              hintText: 'https://example.com/image.jpg',
-                            ),
-                          ),
+                    // Botón para añadir imagen desde la galería
+                    ElevatedButton.icon(
+                      onPressed: _getImageFromGallery,
+                      icon: const Icon(Icons.add_photo_alternate_outlined),
+                      label: const Text('Seleccionar imagen desde galería'),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppTheme.primaryColor,
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(
+                          vertical: 12,
+                          horizontal: 16,
                         ),
-                        const SizedBox(width: 8),
-                        ElevatedButton(
-                          onPressed: () {
-                            final url = _imageController.text.trim();
-                            if (url.isNotEmpty) {
-                              setState(() {
-                                if (!_imageUrls.contains(url)) {
-                                  _imageUrls.add(url);
-                                }
-                                _imageController.clear();
-                              });
-                            }
-                          },
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: AppTheme.primaryColor,
-                            foregroundColor: Colors.white,
-                            padding: const EdgeInsets.symmetric(
-                              vertical: 16,
-                              horizontal: 16,
-                            ),
-                          ),
-                          child: const Text('Añadir'),
-                        ),
-                      ],
+                      ),
                     ),
                     const SizedBox(height: 24),
 
@@ -564,7 +576,7 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: const Text('Cancelar'),
+            child: const Text('Cancelar', style: TextStyle(color: AppTheme.primaryColor),),
           ),
           ElevatedButton(
             onPressed: () {
@@ -608,9 +620,27 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
                .join(' ');
   }
 
+  // Método para guardar imágenes locales y obtener rutas
+  Future<List<String>> _saveImagesToLocalStorage() async {
+    final List<String> savedPaths = [];
+    final appDir = await getApplicationDocumentsDirectory();
+    
+    for (int i = 0; i < _imageFiles.length; i++) {
+      final File imageFile = _imageFiles[i];
+      final String fileName = 'product_image_${DateTime.now().millisecondsSinceEpoch}_$i${path.extension(imageFile.path)}';
+      final String savedPath = path.join(appDir.path, fileName);
+      
+      // Copiar la imagen al almacenamiento local de la aplicación
+      await imageFile.copy(savedPath);
+      savedPaths.add('file://$savedPath');
+    }
+    
+    return savedPaths;
+  }
+  
   Future<void> _saveProduct() async {
     if (_formKey.currentState!.validate()) {
-      if (_imageUrls.isEmpty) {
+      if (_imageFiles.isEmpty && _imageUrls.isEmpty) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('Por favor, agregue al menos una imagen'),
@@ -625,6 +655,15 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
       });
 
       try {
+        // Guardar imágenes locales
+        List<String> savedImagePaths = [];
+        if (_imageFiles.isNotEmpty) {
+          savedImagePaths = await _saveImagesToLocalStorage();
+        }
+        
+        // Combinar rutas de imágenes existentes con las nuevas
+        final List<String> allImagePaths = [..._imageUrls, ...savedImagePaths];
+        
         if (_isEditing) {
           await _productService.updateProduct(
             id: widget.product!.id,
@@ -635,7 +674,7 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
             supplierId: _selectedSupplier,
             currentStock: int.parse(_currentStockController.text),
             minimumStock: int.parse(_minStockController.text),
-            imageUrls: _imageUrls,
+            imageUrls: allImagePaths,
             specifications: _specifications,
           );
 
@@ -657,7 +696,7 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
             supplierId: _selectedSupplier,
             currentStock: int.parse(_currentStockController.text),
             minimumStock: int.parse(_minStockController.text),
-            imageUrls: _imageUrls,
+            imageUrls: allImagePaths,
             specifications: _specifications,
           );
 
@@ -687,6 +726,30 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
           });
         }
       }
+    }
+  }
+
+  // Método para seleccionar imágenes desde la galería
+  Future<void> _getImageFromGallery() async {
+    try {
+      final pickedFiles = await _imagePicker.pickMultiImage(
+        imageQuality: 80,
+      );
+      
+      if (pickedFiles.isNotEmpty) {
+        setState(() {
+          for (var file in pickedFiles) {
+            _imageFiles.add(File(file.path));
+          }
+        });
+      }
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Error al seleccionar imágenes: ${e.toString()}'),
+          backgroundColor: Colors.red,
+        ),
+      );
     }
   }
 } 

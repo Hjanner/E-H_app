@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'dart:io';
 import 'package:ehstore_app/models/product.dart';
 import 'package:ehstore_app/theme/app_theme.dart';
 
@@ -29,16 +30,23 @@ class ProductCard extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               // Imagen del producto
-              if (product.imageUrls.isNotEmpty)
-                ClipRRect(
-                  borderRadius: BorderRadius.circular(12),
-                  child: Image.network(
-                    product.imageUrls.first,
-                    height: 120,
-                    width: double.infinity,
-                    fit: BoxFit.cover,
-                  ),
+              ClipRRect(
+                borderRadius: BorderRadius.circular(12),
+                child: Container(
+                  height: 120,
+                  width: double.infinity,
+                  color: Colors.grey[200],
+                  child: product.imageUrls.isNotEmpty
+                      ? _buildProductImage(product.imageUrls.first)
+                      : const Center(
+                          child: Icon(
+                            Icons.image_outlined,
+                            size: 40,
+                            color: Colors.grey,
+                          ),
+                        ),
                 ),
+              ),
               const SizedBox(height: 12),
               
               // Nombre del producto
@@ -87,5 +95,42 @@ class ProductCard extends StatelessWidget {
         ),
       ),
     );
+  }
+
+  Widget _buildProductImage(String imageUrl) {
+    if (imageUrl.startsWith('file://')) {
+      final file = File(imageUrl.replaceFirst('file://', ''));
+      return Image.file(
+        file,
+        height: 120,
+        width: double.infinity,
+        fit: BoxFit.cover,
+        errorBuilder: (context, error, stackTrace) {
+          return const Center(
+            child: Icon(
+              Icons.broken_image_outlined,
+              size: 40,
+              color: Colors.grey,
+            ),
+          );
+        },
+      );
+    } else {
+      return Image.network(
+        imageUrl,
+        height: 120,
+        width: double.infinity,
+        fit: BoxFit.cover,
+        errorBuilder: (context, error, stackTrace) {
+          return const Center(
+            child: Icon(
+              Icons.broken_image_outlined,
+              size: 40,
+              color: Colors.grey,
+            ),
+          );
+        },
+      );
+    }
   }
 } 

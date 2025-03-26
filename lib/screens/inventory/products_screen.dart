@@ -108,11 +108,15 @@ class _ProductsScreenState extends State<ProductsScreen> {
                   TextField(
                     decoration: InputDecoration(
                       hintText: 'Buscar productos...',
-                      prefixIcon: const Icon(Icons.search),
+                      prefixIcon: Icon(Icons.search, color: AppTheme.primaryColor),
                       border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(12),
                       ),
                       contentPadding: const EdgeInsets.symmetric(vertical: 12),
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: const BorderSide(color: AppTheme.primaryColor),
+                      ),
                     ),
                     onChanged: (value) {
                       setState(() {
@@ -130,9 +134,14 @@ class _ProductsScreenState extends State<ProductsScreen> {
                           value: _selectedCategory,
                           decoration: InputDecoration(
                             labelText: 'Categoría',
+                            labelStyle: TextStyle(color: AppTheme.primaryColor),
                             contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                             border: OutlineInputBorder(
                               borderRadius: BorderRadius.circular(12),
+                            ),
+                            focusedBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(12),
+                              borderSide: const BorderSide(color: AppTheme.primaryColor),
                             ),
                           ),
                           items: const [
@@ -161,6 +170,8 @@ class _ProductsScreenState extends State<ProductsScreen> {
                               _filterProducts();
                             }
                           },
+                          dropdownColor: AppTheme.backgroundColor,
+                          icon: const Icon(Icons.arrow_drop_down, color: AppTheme.primaryColor),
                         ),
                       ),
                       const SizedBox(width: 8),
@@ -176,6 +187,7 @@ class _ProductsScreenState extends State<ProductsScreen> {
                         },
                         selectedColor: AppTheme.primaryColor.withOpacity(0.2),
                         checkmarkColor: AppTheme.primaryColor,
+                        backgroundColor: AppTheme.cardBackground,
                       ),
                     ],
                   ),
@@ -273,7 +285,7 @@ class _ProductsScreenState extends State<ProductsScreen> {
               });
             },
             backgroundColor: AppTheme.primaryColor,
-            child: const Icon(Icons.add),
+            child: const Icon(Icons.add, color: Colors.white),
           ),
         ),
       ],

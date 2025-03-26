@@ -3,6 +3,7 @@ import 'package:ehstore_app/models/product.dart';
 import 'package:ehstore_app/services/product_service.dart';
 import 'package:ehstore_app/theme/app_theme.dart';
 import 'product_form_screen.dart';
+import 'dart:io';
 
 class ProductDetailScreen extends StatefulWidget {
   final String productId;
@@ -36,7 +37,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Detalle del Producto'),
+        title: const Text('Detalle'),
         backgroundColor: AppTheme.backgroundColor,
         elevation: 0,
         iconTheme: const IconThemeData(color: Colors.black),
@@ -156,22 +157,43 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                             });
                           },
                           itemBuilder: (context, index) {
-                            return Image.network(
-                              product.imageUrls[index],
-                              fit: BoxFit.cover,
-                              errorBuilder: (context, error, stackTrace) {
-                                return Container(
-                                  color: Colors.grey[200],
-                                  child: Center(
-                                    child: Icon(
-                                      Icons.image_not_supported_outlined,
-                                      size: 50,
-                                      color: Colors.grey[400],
+                            final imageUrl = product.imageUrls[index];
+                            if (imageUrl.startsWith('file://')) {
+                              final file = File(imageUrl.replaceFirst('file://', ''));
+                              return Image.file(
+                                file,
+                                fit: BoxFit.scaleDown,
+                                errorBuilder: (context, error, stackTrace) {
+                                  return Container(
+                                    color: Colors.grey[200],
+                                    child: const Center(
+                                      child: Icon(
+                                        Icons.broken_image_outlined,
+                                        size: 50,
+                                        color: Colors.grey,
+                                      ),
                                     ),
-                                  ),
-                                );
-                              },
-                            );
+                                  );
+                                },
+                              );
+                            } else {
+                              return Image.network(
+                                imageUrl,
+                                fit: BoxFit.cover,
+                                errorBuilder: (context, error, stackTrace) {
+                                  return Container(
+                                    color: Colors.grey[200],
+                                    child: const Center(
+                                      child: Icon(
+                                        Icons.broken_image_outlined,
+                                        size: 50,
+                                        color: Colors.grey,
+                                      ),
+                                    ),
+                                  );
+                                },
+                              );
+                            }
                           },
                         ),
                         
@@ -197,6 +219,18 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                           ),
                         ),
                       ],
+                    ),
+                  )
+                else
+                  Container(
+                    height: 250,
+                    color: Colors.grey[200],
+                    child: const Center(
+                      child: Icon(
+                        Icons.image_outlined,
+                        size: 80,
+                        color: Colors.grey,
+                      ),
                     ),
                   ),
                 
@@ -524,7 +558,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
-            child: const Text('Cancelar'),
+            child: const Text('Cancelar', style: TextStyle(color: AppTheme.primaryColor),),
           ),
           TextButton(
             onPressed: () => Navigator.pop(context, true),
@@ -588,6 +622,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
     final result = await showDialog<int>(
       context: context,
       builder: (context) => AlertDialog(
+        backgroundColor: Colors.white,
         title: Text(isAddingStock ? 'Agregar Stock' : 'Reducir Stock'),
         content: Form(
           key: formKey,
@@ -597,10 +632,18 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
               labelText: isAddingStock 
                   ? 'Cantidad a agregar' 
                   : 'Cantidad a reducir',
-              border: const OutlineInputBorder(),
+              border: const OutlineInputBorder(
+                borderSide: BorderSide(color: Colors.grey),
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderSide: BorderSide(
+                  color: isAddingStock ? AppTheme.primaryColor : Colors.red,
+                  width: 2.0,
+                ),
+              ),
               prefixIcon: Icon(
                 isAddingStock ? Icons.add : Icons.remove,
-                color: isAddingStock ? Colors.green : Colors.red,
+                color: isAddingStock ? AppTheme.primaryColor : Colors.red,
               ),
             ),
             keyboardType: TextInputType.number,
@@ -625,6 +668,9 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
+            style: TextButton.styleFrom(
+              foregroundColor: AppTheme.primaryColor,
+            ),
             child: const Text('Cancelar'),
           ),
           ElevatedButton(
@@ -635,7 +681,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
               }
             },
             style: ElevatedButton.styleFrom(
-              backgroundColor: isAddingStock ? Colors.green : Colors.red,
+              backgroundColor: isAddingStock ? AppTheme.primaryColor : Colors.red,
               foregroundColor: Colors.white,
             ),
             child: Text(isAddingStock ? 'Agregar' : 'Reducir'),
