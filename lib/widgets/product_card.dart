@@ -24,16 +24,17 @@ class ProductCard extends StatelessWidget {
       child: InkWell(
         onTap: onTap,
         borderRadius: BorderRadius.circular(15),
-        child: Padding(
+        child: Container(
           padding: const EdgeInsets.all(12),
           child: Column(
+            mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               // Imagen del producto
               ClipRRect(
                 borderRadius: BorderRadius.circular(12),
                 child: Container(
-                  height: 120,
+                  height: 100,
                   width: double.infinity,
                   color: Colors.grey[200],
                   child: product.imageUrls.isNotEmpty
@@ -47,19 +48,22 @@ class ProductCard extends StatelessWidget {
                         ),
                 ),
               ),
-              const SizedBox(height: 12),
+              const SizedBox(height: 6),
               
               // Nombre del producto
-              Text(
-                product.name,
-                style: const TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold,
+              SizedBox(
+                height: 40, // Altura fija para 2 líneas de texto
+                child: Text(
+                  product.name,
+                  style: const TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.bold,
+                    height: 1.2,
+                  ),
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
                 ),
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
               ),
-              const SizedBox(height: 4),
               
               // Precio
               Text(
@@ -70,21 +74,21 @@ class ProductCard extends StatelessWidget {
                   fontWeight: FontWeight.w600,
                 ),
               ),
-              const SizedBox(height: 8),
+              const SizedBox(height: 4),
               
               // Stock
               Row(
                 children: [
                   Icon(
                     Icons.inventory_2_outlined,
-                    size: 16,
+                    size: 14,
                     color: product.isLowStock ? Colors.red : Colors.grey[600],
                   ),
                   const SizedBox(width: 4),
                   Text(
                     'Stock: ${product.currentStock}',
                     style: TextStyle(
-                      fontSize: 14,
+                      fontSize: 13,
                       color: product.isLowStock ? Colors.red : Colors.grey[600],
                     ),
                   ),
