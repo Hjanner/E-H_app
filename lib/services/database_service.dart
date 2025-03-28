@@ -15,57 +15,68 @@ class DatabaseService {
 
   Future<Database> get database async {
     if (_database != null) return _database!;
-    _database = await _initDatabase();
+    _database = await _initDB();
     return _database!;
   }
 
-  Future<Database> _initDatabase() async {
+  Future<Database> _initDB() async {
     Directory documentsDirectory = await getApplicationDocumentsDirectory();
     String path = join(documentsDirectory.path, 'ehstore.db');
     return await openDatabase(
       path,
-      version: 1,
-      onCreate: _onCreate,
+      version: 2,
+      onCreate: _createDB,
+      onUpgrade: _upgradeDB,
     );
   }
 
-  Future<void> _onCreate(Database db, int version) async {
+  Future<void> _createDB(Database db, int version) async {
     // Tabla de productos
     await db.execute('''
-      CREATE TABLE products(
-        id TEXT PRIMARY KEY,
+      CREATE TABLE products (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
         name TEXT NOT NULL,
-        description TEXT NOT NULL,
+        description TEXT,
         price REAL NOT NULL,
-        current_stock INTEGER NOT NULL,
-        minimum_stock INTEGER NOT NULL,
-        category_id TEXT NOT NULL,
-        supplier_id TEXT NOT NULL,
-        created_at TEXT NOT NULL,
-        updated_at TEXT NOT NULL
+        stock INTEGER NOT NULL,
+        imageUrl TEXT,
+        category_id INTEGER,
+        FOREIGN KEY (category_id) REFERENCES categories (id)
       )
     ''');
 
-    // Tabla para las URL de imágenes de productos
+    // Tabla de categorías
     await db.execute('''
-      CREATE TABLE product_images(
+      CREATE TABLE categories (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
-        product_id TEXT NOT NULL,
-        image_url TEXT NOT NULL,
-        FOREIGN KEY (product_id) REFERENCES products (id) ON DELETE CASCADE
+        name TEXT NOT NULL,
+        description TEXT,
+        icon TEXT NOT NULL
       )
     ''');
+  }
 
-    // Tabla para las especificaciones de productos
-    await db.execute('''
-      CREATE TABLE product_specifications(
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        product_id TEXT NOT NULL,
-        specification_key TEXT NOT NULL,
-        specification_value TEXT NOT NULL,
-        FOREIGN KEY (product_id) REFERENCES products (id) ON DELETE CASCADE
-      )
-    ''');
+  Future<void> _upgradeDB(Database db, int oldVersion, int newVersion) async {
+    if (oldVersion < 2) {
+      // Crear tabla de categorías si no existe
+      await db.execute('''
+        CREATE TABLE IF NOT EXISTS categories (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          name TEXT NOT NULL,
+          description TEXT,
+          icon TEXT NOT NULL
+        )
+      ''');
+
+      // Agregar campo category_id a la tabla de productos si no existe
+      var info = await db.rawQuery('PRAGMA table_info(products)');
+      bool categoryExists = info.any((column) => column['name'] == 'category_id');
+      
+      if (!categoryExists) {
+        await db.execute('ALTER TABLE products ADD COLUMN category_id INTEGER');
+        await db.execute('ALTER TABLE products ADD FOREIGN KEY (category_id) REFERENCES categories (id)');
+      }
+    }
   }
 
   // MÉTODOS PARA PRODUCTOS
@@ -105,7 +116,7 @@ class DatabaseService {
         name: productMap['name'],
         description: productMap['description'],
         price: productMap['price'],
-        currentStock: productMap['current_stock'],
+        currentStock: productMap['stock'],
         minimumStock: productMap['minimum_stock'],
         categoryId: productMap['category_id'],
         supplierId: productMap['supplier_id'],
@@ -155,7 +166,7 @@ class DatabaseService {
       name: productMaps.first['name'],
       description: productMaps.first['description'],
       price: productMaps.first['price'],
-      currentStock: productMaps.first['current_stock'],
+      currentStock: productMaps.first['stock'],
       minimumStock: productMaps.first['minimum_stock'],
       categoryId: productMaps.first['category_id'],
       supplierId: productMaps.first['supplier_id'],
@@ -175,11 +186,10 @@ class DatabaseService {
       final productId = await txn.insert(
         'products',
         {
-          'id': product.id,
           'name': product.name,
           'description': product.description,
           'price': product.price,
-          'current_stock': product.currentStock,
+          'stock': product.currentStock,
           'minimum_stock': product.minimumStock,
           'category_id': product.categoryId,
           'supplier_id': product.supplierId,
@@ -194,7 +204,7 @@ class DatabaseService {
         await txn.insert(
           'product_images',
           {
-            'product_id': product.id,
+            'product_id': productId,
             'image_url': imageUrl,
           },
         );
@@ -205,7 +215,7 @@ class DatabaseService {
         await txn.insert(
           'product_specifications',
           {
-            'product_id': product.id,
+            'product_id': productId,
             'specification_key': entry.key,
             'specification_value': entry.value.toString(),
           },
@@ -228,7 +238,7 @@ class DatabaseService {
           'name': product.name,
           'description': product.description,
           'price': product.price,
-          'current_stock': product.currentStock,
+          'stock': product.currentStock,
           'minimum_stock': product.minimumStock,
           'category_id': product.categoryId,
           'supplier_id': product.supplierId,
@@ -312,7 +322,7 @@ class DatabaseService {
     return await db.update(
       'products',
       {
-        'current_stock': newStock,
+        'stock': newStock,
         'updated_at': DateTime.now().toIso8601String(),
       },
       where: 'id = ?',
@@ -361,7 +371,7 @@ class DatabaseService {
         name: productMap['name'],
         description: productMap['description'],
         price: productMap['price'],
-        currentStock: productMap['current_stock'],
+        currentStock: productMap['stock'],
         minimumStock: productMap['minimum_stock'],
         categoryId: productMap['category_id'],
         supplierId: productMap['supplier_id'],
@@ -381,7 +391,7 @@ class DatabaseService {
     
     final List<Map<String, dynamic>> productMaps = await db.rawQuery('''
       SELECT * FROM products 
-      WHERE current_stock <= minimum_stock
+      WHERE stock <= minimum_stock
     ''');
     
     if (productMaps.isEmpty) {
@@ -415,7 +425,7 @@ class DatabaseService {
         name: productMap['name'],
         description: productMap['description'],
         price: productMap['price'],
-        currentStock: productMap['current_stock'],
+        currentStock: productMap['stock'],
         minimumStock: productMap['minimum_stock'],
         categoryId: productMap['category_id'],
         supplierId: productMap['supplier_id'],

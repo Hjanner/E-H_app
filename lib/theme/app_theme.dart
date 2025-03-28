@@ -4,6 +4,10 @@ class AppTheme {
   static const primaryColor = Color.fromARGB(255, 1, 166, 255);  // Azul principal
   static const backgroundColor = Colors.white;
   static const cardBackground = Color(0xFFF8F9FE);
+  static const textColor = Colors.black87;           // Color de texto principal
+  static const secondaryColor = Color(0xFF5D5FEF);   // Color secundario
+  static const accentColor = Color(0xFF00C853);      // Color de acento
+  static const errorColor = Color(0xFFE53935);       // Color de error
   
   static ThemeData theme = ThemeData(
     primaryColor: primaryColor,
