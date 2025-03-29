@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:ehstore_app/models/product.dart';
 import 'package:ehstore_app/services/product_service.dart';
 import 'package:ehstore_app/widgets/product_card.dart';
+import 'package:ehstore_app/widgets/category_dropdown.dart';
 import 'package:ehstore_app/theme/app_theme.dart';
 import 'product_form_screen.dart';
 import 'product_detail_screen.dart';
@@ -130,38 +131,9 @@ class _ProductsScreenState extends State<ProductsScreen> {
                     children: [
                       // Categorías
                       Expanded(
-                        child: DropdownButtonFormField<String>(
+                        child: CategoryDropdown(
+                          //labelText: Colors.grey,
                           value: _selectedCategory,
-                          decoration: InputDecoration(
-                            labelText: 'Categoría',
-                            labelStyle: TextStyle(color: AppTheme.primaryColor),
-                            contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                            border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            focusedBorder: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(12),
-                              borderSide: const BorderSide(color: AppTheme.primaryColor),
-                            ),
-                          ),
-                          items: const [
-                            DropdownMenuItem(
-                              value: 'all',
-                              child: Text('Todas'),
-                            ),
-                            DropdownMenuItem(
-                              value: 'electrónica',
-                              child: Text('Electrónica'),
-                            ),
-                            DropdownMenuItem(
-                              value: 'hogar',
-                              child: Text('Hogar'),
-                            ),
-                            DropdownMenuItem(
-                              value: 'ropa',
-                              child: Text('Ropa'),
-                            ),
-                          ],
                           onChanged: (value) {
                             if (value != null) {
                               setState(() {
@@ -170,8 +142,6 @@ class _ProductsScreenState extends State<ProductsScreen> {
                               _filterProducts();
                             }
                           },
-                          dropdownColor: AppTheme.backgroundColor,
-                          icon: const Icon(Icons.arrow_drop_down, color: AppTheme.primaryColor),
                         ),
                       ),
                       const SizedBox(width: 8),

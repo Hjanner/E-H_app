@@ -7,6 +7,9 @@ import 'package:path/path.dart' as path;
 import 'package:ehstore_app/models/product.dart';
 import 'package:ehstore_app/services/product_service.dart';
 import 'package:ehstore_app/theme/app_theme.dart';
+import 'package:ehstore_app/services/category_service.dart';
+import 'package:ehstore_app/models/category.dart';
+import 'package:ehstore_app/widgets/category_dropdown.dart';
 
 class ProductFormScreen extends StatefulWidget {
   final Product? product;
@@ -25,10 +28,10 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
   final _nameController = TextEditingController();
   final _descriptionController = TextEditingController();
   final _priceController = TextEditingController();
-  final _currentStockController = TextEditingController();
+  final _current_stockController = TextEditingController();
   final _minStockController = TextEditingController();
   
-  String _selectedCategory = 'electrónica';
+  String? _selectedCategory;
   String _selectedSupplier = 'samsung';
   final Map<String, dynamic> _specifications = {};
   
@@ -41,13 +44,8 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
   bool _isEditing = false;
 
   final _productService = ProductService();
-
-  // Mapeo de categorías para mostrar al usuario
-  final Map<String, String> _categoryMap = {
-    'electrónica': 'Electrónica',
-    'hogar': 'Hogar',
-    'ropa': 'Ropa',
-  };
+  final CategoryService _categoryService = CategoryService();
+  List<Category> _categories = [];
 
   // Mapeo de proveedores para mostrar al usuario
   final Map<String, String> _supplierMap = {
@@ -62,13 +60,14 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
   void initState() {
     super.initState();
     _isEditing = widget.product != null;
+    _loadCategories();
     
     if (_isEditing) {
       final product = widget.product!;
       _nameController.text = product.name;
       _descriptionController.text = product.description;
       _priceController.text = product.price.toString();
-      _currentStockController.text = product.currentStock.toString();
+      _current_stockController.text = product.current_stock.toString();
       _minStockController.text = product.minimumStock.toString();
       
       _selectedCategory = product.categoryId;
@@ -100,7 +99,7 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
     _nameController.dispose();
     _descriptionController.dispose();
     _priceController.dispose();
-    _currentStockController.dispose();
+    _current_stockController.dispose();
     _minStockController.dispose();
     super.dispose();
   }
@@ -174,25 +173,13 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
                     const SizedBox(height: 16),
 
                     // Categoría
-                    DropdownButtonFormField<String>(
+                    CategoryDropdown(
                       value: _selectedCategory,
-                      decoration: const InputDecoration(
-                        labelText: 'Categoría',
-                        border: OutlineInputBorder(),
-                        prefixIcon: Icon(Icons.category_outlined),
-                      ),
-                      items: _categoryMap.entries
-                          .map((entry) => DropdownMenuItem(
-                                value: entry.key,
-                                child: Text(entry.value),
-                              ))
-                          .toList(),
                       onChanged: (value) {
-                        if (value != null) {
-                          setState(() => _selectedCategory = value);
-                        }
+                        setState(() => _selectedCategory = value);
                       },
-                      dropdownColor: Colors.white, // Ajuste de color de fondo a blanco
+                      showAllOption: false,
+                      labelText: 'Categoría',
                     ),
                     const SizedBox(height: 16),
 
@@ -255,7 +242,7 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
 
                     // Stock Inicial / Actual
                     TextFormField(
-                      controller: _currentStockController,
+                      controller: _current_stockController,
                       decoration: const InputDecoration(
                         labelText: 'Stock actual',
                         border: OutlineInputBorder(),
@@ -670,10 +657,10 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
             name: _nameController.text,
             description: _descriptionController.text,
             price: double.parse(_priceController.text),
+            current_stock: int.parse(_current_stockController.text),
+            minimumStock: int.parse(_minStockController.text),
             categoryId: _selectedCategory,
             supplierId: _selectedSupplier,
-            currentStock: int.parse(_currentStockController.text),
-            minimumStock: int.parse(_minStockController.text),
             imageUrls: allImagePaths,
             specifications: _specifications,
           );
@@ -692,10 +679,10 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
             name: _nameController.text,
             description: _descriptionController.text,
             price: double.parse(_priceController.text),
+            current_stock: int.parse(_current_stockController.text),
+            minimumStock: int.parse(_minStockController.text),
             categoryId: _selectedCategory,
             supplierId: _selectedSupplier,
-            currentStock: int.parse(_currentStockController.text),
-            minimumStock: int.parse(_minStockController.text),
             imageUrls: allImagePaths,
             specifications: _specifications,
           );
@@ -750,6 +737,18 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
           backgroundColor: Colors.red,
         ),
       );
+    }
+  }
+
+  Future<void> _loadCategories() async {
+    try {
+      final categories = await _categoryService.getCategories();
+      setState(() {
+        _categories = categories;
+      });
+    } catch (e) {
+      // Manejar el error
+      print('Error al cargar categorías: $e');
     }
   }
 } 

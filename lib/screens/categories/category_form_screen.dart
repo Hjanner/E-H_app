@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import '../../models/category.dart';
 import '../../services/category_service.dart';
 import '../../theme/app_theme.dart';
-//import 'icon_selector_dialog.dart';
+import 'icon_selector_dialog.dart';
 
 class CategoryFormScreen extends StatefulWidget {
   final Category? category;
@@ -178,32 +178,34 @@ class _CategoryFormScreenState extends State<CategoryFormScreen> {
   void _showIconSelector() async {
     final selectedIcon = await showDialog<String>(
       context: context,
-//      builder: (context) => IconSelectorDialog(currentIcon: _selectedIcon),
-      builder: (context) => AlertDialog(
-        title: const Text('Seleccionar Icono'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(
-              IconData(int.parse(_selectedIcon), fontFamily: 'MaterialIcons'),
-              size: 48,
-              color: AppTheme.primaryColor,
-            ),
-            const SizedBox(height: 16),
-            const Text('Selector de iconos en desarrollo'),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancelar'),
-          ),
-          TextButton(
-            onPressed: () => Navigator.pop(context, _selectedIcon),
-            child: const Text('Seleccionar'),
-          ),
-        ],
-      ),
+      //builder: (context) => IconSelectorDialog(currentIcon: categoriaActual.icon),
+
+      builder: (context) => IconSelectorDialog(currentIcon: _selectedIcon),
+      // builder: (context) => AlertDialog(
+      //   title: const Text('Seleccionar Icono'),
+      //   content: Column(
+      //     mainAxisSize: MainAxisSize.min,
+      //     children: [
+      //       Icon(
+      //         IconData(int.parse(_selectedIcon), fontFamily: 'MaterialIcons'),
+      //         size: 48,
+      //         color: AppTheme.primaryColor,
+      //       ),
+      //       const SizedBox(height: 16),
+      //       const Text('Selector de iconos en desarrollo'),
+      //     ],
+      //   ),
+      //   actions: [
+      //     TextButton(
+      //       onPressed: () => Navigator.pop(context),
+      //       child: const Text('Cancelar'),
+      //     ),
+      //     TextButton(
+      //       onPressed: () => Navigator.pop(context, _selectedIcon),
+      //       child: const Text('Seleccionar'),
+      //     ),
+      //   ],
+      // ),
     );
     
     if (selectedIcon != null) {

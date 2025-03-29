@@ -38,9 +38,13 @@ class DatabaseService {
         name TEXT NOT NULL,
         description TEXT,
         price REAL NOT NULL,
-        stock INTEGER NOT NULL,
+        current_stock INTEGER NOT NULL,
+        minimum_stock INTEGER DEFAULT 0,
         imageUrl TEXT,
         category_id INTEGER,
+        supplier_id TEXT,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL,
         FOREIGN KEY (category_id) REFERENCES categories (id)
       )
     ''');
@@ -54,6 +58,31 @@ class DatabaseService {
         icon TEXT NOT NULL
       )
     ''');
+
+    // Tabla para imágenes de productos
+    await db.execute('''
+      CREATE TABLE product_images (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        product_id INTEGER NOT NULL,
+        image_url TEXT NOT NULL,
+        FOREIGN KEY (product_id) REFERENCES products (id)
+      )
+    ''');
+
+    // Tabla para especificaciones de productos
+    await db.execute('''
+      CREATE TABLE product_specifications (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        product_id INTEGER NOT NULL,
+        specification_key TEXT NOT NULL,
+        specification_value TEXT NOT NULL,
+        FOREIGN KEY (product_id) REFERENCES products (id)
+      )
+    ''');
+
+  //aca 
+    var tableInfo = await db.rawQuery("PRAGMA table_info(products)");
+    print("Estructura de tabla products: $tableInfo");
   }
 
   Future<void> _upgradeDB(Database db, int oldVersion, int newVersion) async {
@@ -74,8 +103,51 @@ class DatabaseService {
       
       if (!categoryExists) {
         await db.execute('ALTER TABLE products ADD COLUMN category_id INTEGER');
-        await db.execute('ALTER TABLE products ADD FOREIGN KEY (category_id) REFERENCES categories (id)');
       }
+
+      // Verificar y añadir minimum_stock si no existe
+      bool minimumStockExists = info.any((column) => column['name'] == 'minimum_stock');
+      if (!minimumStockExists) {
+        await db.execute('ALTER TABLE products ADD COLUMN minimum_stock INTEGER DEFAULT 0');
+      }
+
+      // Verificar y añadir supplier_id si no existe
+      bool supplierIdExists = info.any((column) => column['name'] == 'supplier_id');
+      if (!supplierIdExists) {
+        await db.execute('ALTER TABLE products ADD COLUMN supplier_id TEXT');
+      }
+
+      // Verificar y añadir created_at si no existe
+      bool createdAtExists = info.any((column) => column['name'] == 'created_at');
+      if (!createdAtExists) {
+        await db.execute('ALTER TABLE products ADD COLUMN created_at TEXT DEFAULT \'' + DateTime.now().toIso8601String() + '\'');
+      }
+
+      // Verificar y añadir updated_at si no existe
+      bool updatedAtExists = info.any((column) => column['name'] == 'updated_at');
+      if (!updatedAtExists) {
+        await db.execute('ALTER TABLE products ADD COLUMN updated_at TEXT DEFAULT \'' + DateTime.now().toIso8601String() + '\'');
+      }
+
+      // Crear tablas para imágenes y especificaciones si no existen
+      await db.execute('''
+        CREATE TABLE IF NOT EXISTS product_images (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          product_id INTEGER NOT NULL,
+          image_url TEXT NOT NULL,
+          FOREIGN KEY (product_id) REFERENCES products (id)
+        )
+      ''');
+
+      await db.execute('''
+        CREATE TABLE IF NOT EXISTS product_specifications (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          product_id INTEGER NOT NULL,
+          specification_key TEXT NOT NULL,
+          specification_value TEXT NOT NULL,
+          FOREIGN KEY (product_id) REFERENCES products (id)
+        )
+      ''');
     }
   }
 
@@ -112,18 +184,18 @@ class DatabaseService {
 
       // Crear el objeto Product
       products.add(Product(
-        id: productMap['id'],
-        name: productMap['name'],
-        description: productMap['description'],
-        price: productMap['price'],
-        currentStock: productMap['stock'],
-        minimumStock: productMap['minimum_stock'],
-        categoryId: productMap['category_id'],
-        supplierId: productMap['supplier_id'],
+        id: productMap['id'].toString(),
+        name: productMap['name'] as String,
+        description: productMap['description'] as String,
+        price: (productMap['price'] as num).toDouble(),
+        current_stock: productMap['current_stock'] as int,
+        minimumStock: productMap['minimum_stock'] != null ? productMap['minimum_stock'] as int : 0,
+        categoryId: productMap['category_id']?.toString(),
+        supplierId: productMap['supplier_id'] as String? ?? '',
         imageUrls: imageUrls,
         specifications: specifications,
-        createdAt: DateTime.parse(productMap['created_at']),
-        updatedAt: DateTime.parse(productMap['updated_at']),
+        createdAt: DateTime.parse(productMap['created_at'] as String),
+        updatedAt: DateTime.parse(productMap['updated_at'] as String),
       ));
     }
 
@@ -162,18 +234,18 @@ class DatabaseService {
     }
 
     return Product(
-      id: productMaps.first['id'],
-      name: productMaps.first['name'],
-      description: productMaps.first['description'],
-      price: productMaps.first['price'],
-      currentStock: productMaps.first['stock'],
-      minimumStock: productMaps.first['minimum_stock'],
-      categoryId: productMaps.first['category_id'],
-      supplierId: productMaps.first['supplier_id'],
+      id: productMaps.first['id'].toString(),
+      name: productMaps.first['name'] as String,
+      description: productMaps.first['description'] as String,
+      price: (productMaps.first['price'] as num).toDouble(),
+      current_stock: productMaps.first['current_stock'] as int,
+      minimumStock: productMaps.first['minimum_stock'] != null ? productMaps.first['minimum_stock'] as int : 0,
+      categoryId: productMaps.first['category_id']?.toString(),
+      supplierId: productMaps.first['supplier_id'] as String? ?? '',
       imageUrls: imageUrls,
       specifications: specifications,
-      createdAt: DateTime.parse(productMaps.first['created_at']),
-      updatedAt: DateTime.parse(productMaps.first['updated_at']),
+      createdAt: DateTime.parse(productMaps.first['created_at'] as String),
+      updatedAt: DateTime.parse(productMaps.first['updated_at'] as String),
     );
   }
 
@@ -189,7 +261,7 @@ class DatabaseService {
           'name': product.name,
           'description': product.description,
           'price': product.price,
-          'stock': product.currentStock,
+          'current_stock': product.current_stock,
           'minimum_stock': product.minimumStock,
           'category_id': product.categoryId,
           'supplier_id': product.supplierId,
@@ -238,7 +310,7 @@ class DatabaseService {
           'name': product.name,
           'description': product.description,
           'price': product.price,
-          'stock': product.currentStock,
+          'current_stock': product.current_stock,
           'minimum_stock': product.minimumStock,
           'category_id': product.categoryId,
           'supplier_id': product.supplierId,
@@ -322,7 +394,7 @@ class DatabaseService {
     return await db.update(
       'products',
       {
-        'stock': newStock,
+        'current_stock': newStock,
         'updated_at': DateTime.now().toIso8601String(),
       },
       where: 'id = ?',
@@ -371,7 +443,7 @@ class DatabaseService {
         name: productMap['name'],
         description: productMap['description'],
         price: productMap['price'],
-        currentStock: productMap['stock'],
+        current_stock: productMap['current_stock'],
         minimumStock: productMap['minimum_stock'],
         categoryId: productMap['category_id'],
         supplierId: productMap['supplier_id'],
@@ -391,7 +463,7 @@ class DatabaseService {
     
     final List<Map<String, dynamic>> productMaps = await db.rawQuery('''
       SELECT * FROM products 
-      WHERE stock <= minimum_stock
+      WHERE current_stock <= minimum_stock
     ''');
     
     if (productMaps.isEmpty) {
@@ -421,18 +493,18 @@ class DatabaseService {
 
       // Crear el objeto Product
       products.add(Product(
-        id: productMap['id'],
-        name: productMap['name'],
-        description: productMap['description'],
-        price: productMap['price'],
-        currentStock: productMap['stock'],
-        minimumStock: productMap['minimum_stock'],
-        categoryId: productMap['category_id'],
-        supplierId: productMap['supplier_id'],
+        id: productMap['id'].toString(),
+        name: productMap['name'] as String,
+        description: productMap['description'] as String,
+        price: (productMap['price'] as num).toDouble(),
+        current_stock: productMap['current_stock'] as int,
+        minimumStock: productMap['minimum_stock'] != null ? productMap['minimum_stock'] as int : 0,
+        categoryId: productMap['category_id']?.toString(),
+        supplierId: productMap['supplier_id'] as String? ?? '',
         imageUrls: imageUrls,
         specifications: specifications,
-        createdAt: DateTime.parse(productMap['created_at']),
-        updatedAt: DateTime.parse(productMap['updated_at']),
+        createdAt: DateTime.parse(productMap['created_at'] as String),
+        updatedAt: DateTime.parse(productMap['updated_at'] as String),
       ));
     }
 

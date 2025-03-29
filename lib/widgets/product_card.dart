@@ -86,7 +86,7 @@ class ProductCard extends StatelessWidget {
                   ),
                   const SizedBox(width: 4),
                   Text(
-                    'Stock: ${product.currentStock}',
+                    'Stock: ${product.current_stock}',
                     style: TextStyle(
                       fontSize: 13,
                       color: product.isLowStock ? Colors.red : Colors.grey[600],

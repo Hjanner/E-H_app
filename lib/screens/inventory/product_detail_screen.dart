@@ -272,7 +272,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                           const Icon(Icons.category_outlined, size: 18, color: Colors.grey),
                           const SizedBox(width: 8),
                           Text(
-                            _getCategoryName(product.categoryId),
+                            _getCategoryName(product.categoryId ?? ''),
                             style: const TextStyle(
                               color: Colors.grey,
                               fontWeight: FontWeight.w500,
@@ -334,7 +334,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                                 ),
                                 const SizedBox(width: 4),
                                 Text(
-                                  '${product.currentStock} unidades',
+                                  '${product.current_stock} unidades',
                                   style: TextStyle(
                                     fontWeight: FontWeight.w600,
                                     color: product.isLowStock
@@ -469,7 +469,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                   child: OutlinedButton.icon(
                     onPressed: _isLoading 
                         ? null 
-                        : product.currentStock <= 0 
+                        : product.current_stock <= 0 
                             ? null 
                             : () => _showStockDialog(product, false),
                     icon: const Icon(Icons.remove),
@@ -489,7 +489,11 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
     );
   }
 
-  String _getCategoryName(String categoryId) {
+  String _getCategoryName(String? categoryId) {
+    if (categoryId == null || categoryId.isEmpty) {
+      return "Sin categoría";
+    }
+    
     final Map<String, String> categories = {
       'electrónica': 'Electrónica',
       'hogar': 'Hogar',
@@ -657,8 +661,8 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                 return 'Ingrese un número válido mayor a 0';
               }
               
-              if (!isAddingStock && quantity > product.currentStock) {
-                return 'No puede reducir más de ${product.currentStock} unidades';
+              if (!isAddingStock && quantity > product.current_stock) {
+                return 'No puede reducir más de ${product.current_stock} unidades';
               }
               
               return null;

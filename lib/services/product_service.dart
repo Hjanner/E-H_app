@@ -63,9 +63,9 @@ class ProductService {
     required String name,
     required String description,
     required double price,
-    required int currentStock,
+    required int current_stock,
     required int minimumStock,
-    required String categoryId,
+    String? categoryId,
     required String supplierId,
     required List<String> imageUrls,
     required Map<String, dynamic> specifications,
@@ -76,7 +76,7 @@ class ProductService {
       name: name,
       description: description,
       price: price,
-      currentStock: currentStock,
+      current_stock: current_stock,
       minimumStock: minimumStock,
       categoryId: categoryId,
       supplierId: supplierId,
@@ -96,7 +96,7 @@ class ProductService {
     String? name,
     String? description,
     double? price,
-    int? currentStock,
+    int? current_stock,
     int? minimumStock,
     String? categoryId,
     String? supplierId,
@@ -111,7 +111,7 @@ class ProductService {
       name: name ?? oldProduct.name,
       description: description ?? oldProduct.description,
       price: price ?? oldProduct.price,
-      currentStock: currentStock ?? oldProduct.currentStock,
+      current_stock: current_stock ?? oldProduct.current_stock,
       minimumStock: minimumStock ?? oldProduct.minimumStock,
       categoryId: categoryId ?? oldProduct.categoryId,
       supplierId: supplierId ?? oldProduct.supplierId,
@@ -136,7 +136,7 @@ class ProductService {
     final product = await _dbService.getProductById(id);
     if (product == null) return null;
 
-    final newStock = product.currentStock + quantity;
+    final newStock = product.current_stock + quantity;
     await _dbService.updateProductStock(id, newStock);
     
     return await _dbService.getProductById(id);
@@ -147,11 +147,11 @@ class ProductService {
     final product = await _dbService.getProductById(id);
     if (product == null) return null;
 
-    if (product.currentStock < quantity) {
+    if (product.current_stock < quantity) {
       throw Exception('No hay suficiente stock disponible');
     }
 
-    final newStock = product.currentStock - quantity;
+    final newStock = product.current_stock - quantity;
     await _dbService.updateProductStock(id, newStock);
     
     return await _dbService.getProductById(id);
@@ -169,7 +169,7 @@ class ProductService {
         name: 'Smartphone Samsung Galaxy S21',
         description: 'Smartphone de alta gama con cámara de 108MP y pantalla AMOLED de 6.2"',
         price: 799.99,
-        currentStock: 15,
+        current_stock: 15,
         minimumStock: 5,
         categoryId: 'electrónica',
         supplierId: 'samsung',
@@ -188,7 +188,7 @@ class ProductService {
         name: 'Laptop HP Pavilion',
         description: 'Laptop con procesador Intel i5, 8GB RAM y SSD de 512GB',
         price: 649.99,
-        currentStock: 8,
+        current_stock: 8,
         minimumStock: 3,
         categoryId: 'electrónica',
         supplierId: 'hp',
@@ -207,7 +207,7 @@ class ProductService {
         name: 'Silla de Oficina Ergonómica',
         description: 'Silla ergonómica con soporte lumbar y apoyabrazos ajustables',
         price: 199.99,
-        currentStock: 12,
+        current_stock: 12,
         minimumStock: 5,
         categoryId: 'hogar',
         supplierId: 'muebles_inc',
@@ -225,7 +225,7 @@ class ProductService {
         name: 'Televisor LG OLED 65"',
         description: 'Smart TV OLED con resolución 4K y tecnología de IA',
         price: 1299.99,
-        currentStock: 5,
+        current_stock: 5,
         minimumStock: 2,
         categoryId: 'electrónica',
         supplierId: 'lg',
@@ -244,7 +244,7 @@ class ProductService {
         name: 'Camisa de Algodón Premium',
         description: 'Camisa casual de algodón de alta calidad con diseño elegante',
         price: 49.99,
-        currentStock: 25,
+        current_stock: 25,
         minimumStock: 10,
         categoryId: 'ropa',
         supplierId: 'fashion_inc',

@@ -8,6 +8,7 @@ import 'package:ehstore_app/theme/app_theme.dart';
 import 'package:ehstore_app/widgets/balance_card.dart';
 import 'package:ehstore_app/widgets/quick_action_grid.dart';
 import 'package:ehstore_app/widgets/alert_section.dart';
+import 'package:ehstore_app/services/database_service.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -18,6 +19,7 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> {
   int _selectedIndex = 0;
+  final DatabaseService _databaseService = DatabaseService();
 
   @override
   Widget build(BuildContext context) {
@@ -28,7 +30,11 @@ class _HomeScreenState extends State<HomeScreen> {
               actions: [
                 IconButton(
                   icon: const Icon(Icons.settings_outlined),
-                  onPressed: () {},
+                  onPressed: () async {
+                    final db = await _databaseService.database;
+                    var tableInfo = await db.rawQuery("PRAGMA table_info(products)");
+                    print("Estructura de tabla products: $tableInfo");
+                  },
                 ),
               ],
             )

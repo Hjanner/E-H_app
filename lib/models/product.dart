@@ -5,9 +5,9 @@ class Product {
   final String name;
   final String description;
   final double price;
-  final int currentStock;
+  final int current_stock;
   final int minimumStock;
-  final String categoryId;
+  final String? categoryId;
   final String supplierId;
   final List<String> imageUrls;
   final Map<String, dynamic> specifications;
@@ -19,9 +19,9 @@ class Product {
     required this.name,
     required this.description,
     required this.price,
-    required this.currentStock,
+    required this.current_stock,
     required this.minimumStock,
-    required this.categoryId,
+    this.categoryId,
     required this.supplierId,
     required this.imageUrls,
     required this.specifications,
@@ -29,7 +29,7 @@ class Product {
     required this.updatedAt,
   });
 
-  bool get isLowStock => currentStock <= minimumStock;
+  bool get isLowStock => current_stock <= minimumStock;
 
   factory Product.fromJson(Map<String, dynamic> json) {
     return Product(
@@ -37,9 +37,9 @@ class Product {
       name: json['name'] as String,
       description: json['description'] as String,
       price: (json['price'] as num).toDouble(),
-      currentStock: json['currentStock'] as int,
+      current_stock: json['current_stock'] as int,
       minimumStock: json['minimumStock'] as int,
-      categoryId: json['categoryId'] as String,
+      categoryId: json['categoryId'] as String?,
       supplierId: json['supplierId'] as String,
       imageUrls: List<String>.from(json['imageUrls'] as List),
       specifications: json['specifications'] as Map<String, dynamic>,
@@ -54,7 +54,7 @@ class Product {
       'name': name,
       'description': description,
       'price': price,
-      'currentStock': currentStock,
+      'current_stock': current_stock,
       'minimumStock': minimumStock,
       'categoryId': categoryId,
       'supplierId': supplierId,
