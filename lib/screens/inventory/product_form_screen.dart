@@ -5,7 +5,9 @@ import 'package:image_picker/image_picker.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:path/path.dart' as path;
 import 'package:ehstore_app/models/product.dart';
+import 'package:ehstore_app/models/category.dart';
 import 'package:ehstore_app/services/product_service.dart';
+import 'package:ehstore_app/services/category_service.dart';
 import 'package:ehstore_app/theme/app_theme.dart';
 
 class ProductFormScreen extends StatefulWidget {
@@ -38,16 +40,14 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
   final ImagePicker _imagePicker = ImagePicker();
   
   bool _isLoading = false;
+  bool _isLoadingCategories = true;
   bool _isEditing = false;
 
   final _productService = ProductService();
+  final _categoryService = CategoryService();
 
   // Mapeo de categorías para mostrar al usuario
-  final Map<String, String> _categoryMap = {
-    'electrónica': 'Electrónica',
-    'hogar': 'Hogar',
-    'ropa': 'Ropa',
-  };
+  Map<String, String> _categoryMap = {};
 
   // Mapeo de proveedores para mostrar al usuario
   final Map<String, String> _supplierMap = {
@@ -62,6 +62,8 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
   void initState() {
     super.initState();
     _isEditing = widget.product != null;
+    
+    _loadCategories();
     
     if (_isEditing) {
       final product = widget.product!;
@@ -92,6 +94,54 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
           _imageUrls.add(url);
         }
       }
+    }
+  }
+
+  Future<void> _loadCategories() async {
+    try {
+      final categories = await _categoryService.getAllCategories();
+      
+      if (categories.isEmpty) {
+        setState(() {
+          _categoryMap = {
+            'electrónica': 'Electrónica',
+            'hogar': 'Hogar',
+            'ropa': 'Ropa',
+          };
+          _isLoadingCategories = false;
+        });
+      } else {
+        final Map<String, String> categoryMap = {};
+        for (var category in categories) {
+          categoryMap[category.id] = category.name;
+        }
+        
+        setState(() {
+          _categoryMap = categoryMap;
+          _isLoadingCategories = false;
+          
+          // Verificar si la categoría seleccionada existe
+          if (!_categoryMap.containsKey(_selectedCategory) && _categoryMap.isNotEmpty) {
+            _selectedCategory = _categoryMap.keys.first;
+          }
+        });
+      }
+    } catch (e) {
+      setState(() {
+        _categoryMap = {
+          'electrónica': 'Electrónica',
+          'hogar': 'Hogar',
+          'ropa': 'Ropa',
+        };
+        _isLoadingCategories = false;
+      });
+      
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Error al cargar categorías: $e'),
+          backgroundColor: Colors.red,
+        ),
+      );
     }
   }
 
@@ -174,26 +224,35 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
                     const SizedBox(height: 16),
 
                     // Categoría
-                    DropdownButtonFormField<String>(
-                      value: _selectedCategory,
-                      decoration: const InputDecoration(
-                        labelText: 'Categoría',
-                        border: OutlineInputBorder(),
-                        prefixIcon: Icon(Icons.category_outlined),
-                      ),
-                      items: _categoryMap.entries
-                          .map((entry) => DropdownMenuItem(
-                                value: entry.key,
-                                child: Text(entry.value),
-                              ))
-                          .toList(),
-                      onChanged: (value) {
-                        if (value != null) {
-                          setState(() => _selectedCategory = value);
-                        }
-                      },
-                      dropdownColor: Colors.white, // Ajuste de color de fondo a blanco
-                    ),
+                    _isLoadingCategories
+                        ? const Center(
+                            child: Padding(
+                              padding: EdgeInsets.symmetric(vertical: 16.0),
+                              child: CircularProgressIndicator(
+                                valueColor: AlwaysStoppedAnimation<Color>(AppTheme.primaryColor),
+                              ),
+                            ),
+                          )
+                        : DropdownButtonFormField<String>(
+                            value: _selectedCategory,
+                            decoration: const InputDecoration(
+                              labelText: 'Categoría',
+                              border: OutlineInputBorder(),
+                              prefixIcon: Icon(Icons.category_outlined),
+                            ),
+                            items: _categoryMap.entries
+                                .map((entry) => DropdownMenuItem(
+                                      value: entry.key,
+                                      child: Text(entry.value),
+                                    ))
+                                .toList(),
+                            onChanged: (value) {
+                              if (value != null) {
+                                setState(() => _selectedCategory = value);
+                              }
+                            },
+                            dropdownColor: Colors.white,
+                          ),
                     const SizedBox(height: 16),
 
                     // Proveedor
@@ -233,7 +292,7 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
                     TextFormField(
                       controller: _priceController,
                       decoration: const InputDecoration(
-                        labelText: 'Precio (MXN)',
+                        labelText: 'Precio (Dolar)',
                         border: OutlineInputBorder(),
                         prefixIcon: Icon(Icons.attach_money),
                       ),
@@ -442,12 +501,13 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
                       ListView.builder(
                         shrinkWrap: true,
                         physics: const NeverScrollableScrollPhysics(),
-                        itemCount: _specifications.length,
+                        itemCount: _specifications.length,                        
                         itemBuilder: (context, index) {
                           final entry = _specifications.entries.elementAt(index);
                           return Card(
                             margin: const EdgeInsets.only(bottom: 8),
                             elevation: 2,
+                            color: AppTheme.cardBackground,
                             child: ListTile(
                               title: Text(
                                 _formatSpecName(entry.key),
@@ -465,7 +525,7 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
                                 },
                               ),
                             ),
-                          );
+                          );                          
                         },
                       ),
                   ],

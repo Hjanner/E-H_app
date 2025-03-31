@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:ehstore_app/theme/app_theme.dart';
 import 'products_screen.dart';
+import 'category_list_screen.dart';
 
 class InventoryScreen extends StatefulWidget {
   const InventoryScreen({super.key});
@@ -39,7 +40,7 @@ class _InventoryScreenState extends State<InventoryScreen> with SingleTickerProv
         controller: _tabController,
         children: [
           const ProductsScreen(),
-          _buildPlaceholder('Categorías'),
+          const CategoryListScreen(),
           _buildPlaceholder('Proveedores'),
         ],
       ),
@@ -52,9 +53,7 @@ class _InventoryScreenState extends State<InventoryScreen> with SingleTickerProv
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
           Icon(
-            title == 'Categorías' 
-                ? Icons.category_outlined 
-                : Icons.business_outlined,
+            Icons.business_outlined,
             size: 64,
             color: Colors.grey[400],
           ),
