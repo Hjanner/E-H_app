@@ -1,9 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:ehstore_app/theme/app_theme.dart';
+import 'package:ehstore_app/models/product.dart';
+import 'package:ehstore_app/widgets/product_card.dart';
+import 'package:ehstore_app/screens/inventory/product_detail_screen.dart';
 
 class AlertSection extends StatelessWidget {
   final String title;
-  final List<dynamic> items;
+  final List<Product> items;
 
   const AlertSection({
     super.key,
@@ -23,7 +26,7 @@ class AlertSection extends StatelessWidget {
             fontWeight: FontWeight.w600,
           ),
         ),
-        const SizedBox(height: 12),
+        const SizedBox(height: 8),
         if (items.isEmpty)
           Container(
             padding: const EdgeInsets.all(16),
@@ -39,6 +42,34 @@ class AlertSection extends StatelessWidget {
                   fontSize: 14,
                 ),
               ),
+            ),
+          )
+        else
+          SizedBox(
+            height: 180,
+            child: ListView.builder(
+              scrollDirection: Axis.horizontal,
+              itemCount: items.length,
+              itemBuilder: (context, index) {
+                return SizedBox(
+                  width: 150,
+                  child: Padding(
+                    padding: const EdgeInsets.only(right: 12),
+                    child: ProductCard(
+                      product: items[index],
+                      showPrice: false,
+                      onTap: () => Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => ProductDetailScreen(
+                            productId: items[index].id,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                );
+              },
             ),
           ),
       ],

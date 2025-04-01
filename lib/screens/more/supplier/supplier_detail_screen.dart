@@ -6,7 +6,7 @@ import 'package:ehstore_app/widgets/product_card.dart';
 import 'package:ehstore_app/theme/app_theme.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'supplier_form_screen.dart';
-import 'product_detail_screen.dart';
+import '../../inventory/product_detail_screen.dart';
 import 'package:flutter/services.dart';
 
 

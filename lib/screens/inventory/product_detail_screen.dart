@@ -6,7 +6,7 @@ import 'product_form_screen.dart';
 import 'dart:io';
 import 'package:ehstore_app/services/supplier_service.dart';
 import 'package:ehstore_app/models/supplier.dart';
-import 'supplier_detail_screen.dart';
+import '../more/supplier/supplier_detail_screen.dart';
 
 class ProductDetailScreen extends StatefulWidget {
   final String productId;

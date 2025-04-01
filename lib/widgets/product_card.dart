@@ -6,11 +6,13 @@ import 'package:ehstore_app/theme/app_theme.dart';
 class ProductCard extends StatelessWidget {
   final Product product;
   final VoidCallback onTap;
+  final bool showPrice;
 
   const ProductCard({
     super.key,
     required this.product,
     required this.onTap,
+    this.showPrice = true,
   });
 
   @override
@@ -65,15 +67,16 @@ class ProductCard extends StatelessWidget {
                 ),
               ),
               
-              // Precio
-              Text(
-                '\$${product.price.toStringAsFixed(2)}',
-                style: TextStyle(
-                  fontSize: 15,
-                  color: AppTheme.primaryColor,
-                  fontWeight: FontWeight.w600,
+              // Precio (opcional)
+              if (showPrice)
+                Text(
+                  '\$${product.price.toStringAsFixed(2)}',
+                  style: TextStyle(
+                    fontSize: 15,
+                    color: AppTheme.primaryColor,
+                    fontWeight: FontWeight.w600,
+                  ),
                 ),
-              ),
               const SizedBox(height: 4),
               
               // Stock

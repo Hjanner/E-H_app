@@ -1,13 +1,16 @@
 import 'package:flutter/material.dart';
 import 'package:ehstore_app/screens/inventory/inventory_screen.dart';
 import 'package:ehstore_app/screens/sales/sales_screen.dart';
-import 'package:ehstore_app/screens/customers/customers_screen.dart';
+import 'package:ehstore_app/screens/more/customers/customers_screen.dart';
 import 'package:ehstore_app/screens/reports/reports_screen.dart';
 import 'package:ehstore_app/screens/settings/settings_screen.dart';
+import 'package:ehstore_app/screens/more/more_screen.dart';
 import 'package:ehstore_app/theme/app_theme.dart';
 import 'package:ehstore_app/widgets/balance_card.dart';
 import 'package:ehstore_app/widgets/quick_action_grid.dart';
 import 'package:ehstore_app/widgets/alert_section.dart';
+import 'package:ehstore_app/models/product.dart';
+import 'package:ehstore_app/services/product_service.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -18,6 +21,34 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> {
   int _selectedIndex = 0;
+  final ProductService _productService = ProductService();
+  List<Product> _lowStockProducts = [];
+  bool _isLoading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadLowStockProducts();
+  }
+
+  Future<void> _loadLowStockProducts() async {
+    setState(() {
+      _isLoading = true;
+    });
+
+    try {
+      final products = await _productService.getLowStockProducts();
+      setState(() {
+        _lowStockProducts = products;
+        _isLoading = false;
+      });
+    } catch (e) {
+      setState(() {
+        _isLoading = false;
+      });
+      // Manejamos el error pero no mostramos mensajes en initState
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -26,6 +57,10 @@ class _HomeScreenState extends State<HomeScreen> {
           ? AppBar(
               title: const Text('E&H'),
               actions: [
+                IconButton(
+                  icon: const Icon(Icons.refresh),
+                  onPressed: _loadLowStockProducts,
+                ),
                 IconButton(
                   icon: const Icon(Icons.settings_outlined),
                   onPressed: () {},
@@ -83,27 +118,29 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Widget _buildHomeContent() {
-    return SingleChildScrollView(
-      child: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const BalanceCard(),
-            const SizedBox(height: 24),
-            const QuickActionGrid(),
-            const SizedBox(height: 24),
-            const AlertSection(
-              title: 'Alerta de Stock bajo',
-              items: [], // TODO: Implementar items
-            ),
-            const SizedBox(height: 16),
-            const AlertSection(
-              title: 'Pedidos en camino',
-              items: [], // TODO: Implementar items
-            ),
-          ],
-        ),
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const BalanceCard(),
+          const SizedBox(height: 16),
+          const QuickActionGrid(),
+          const SizedBox(height: 16),
+          _isLoading
+            ? const Center(
+                child: Padding(
+                  padding: EdgeInsets.all(20.0),
+                  child: CircularProgressIndicator(
+                    valueColor: AlwaysStoppedAnimation<Color>(AppTheme.primaryColor),
+                  ),
+                ),
+              )
+            : AlertSection(
+                title: 'Alerta de Stock bajo',
+                items: _lowStockProducts,
+              ),
+        ],
       ),
     );
   }
@@ -113,9 +150,7 @@ class _HomeScreenState extends State<HomeScreen> {
       Container(), // Home (ya manejado por _buildHomeContent)
       const InventoryScreen(),
       const SalesScreen(),
-      const CustomersScreen(),
-      const ReportsScreen(),
-      const SettingsScreen(),
+      const MoreScreen(),
     ];
   }
 } 

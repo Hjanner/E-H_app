@@ -7,6 +7,7 @@ class ProductService {
   static final _uuid = Uuid();
   static bool _mockDataAdded = false;
 
+
   // Obtener todos los productos
   Future<List<Product>> getAllProducts() async {
     final products = await _dbService.getAllProducts();
@@ -20,6 +21,11 @@ class ProductService {
   // Obtener producto por ID
   Future<Product?> getProductById(String id) async {
     return await _dbService.getProductById(id);
+  }
+
+  // Obtener productos con stock bajo
+  Future<List<Product>> getLowStockProducts() async {
+    return await _dbService.getLowStockProducts();
   }
 
   // Filtrar productos
@@ -57,6 +63,7 @@ class ProductService {
       return true;
     }).toList();
   }
+
 
   // Crear producto
   Future<Product> createProduct({

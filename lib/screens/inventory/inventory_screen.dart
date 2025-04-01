@@ -1,8 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:ehstore_app/theme/app_theme.dart';
 import 'products_screen.dart';
-import 'category_list_screen.dart';
-import 'supplier_list_screen.dart';
+import 'purchases_screen.dart';
 
 class InventoryScreen extends StatefulWidget {
   const InventoryScreen({super.key});
@@ -17,7 +16,7 @@ class _InventoryScreenState extends State<InventoryScreen> with SingleTickerProv
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 3, vsync: this);
+    _tabController = TabController(length: 2, vsync: this);
   }
 
   @override
@@ -32,8 +31,7 @@ class _InventoryScreenState extends State<InventoryScreen> with SingleTickerProv
           indicatorColor: AppTheme.primaryColor,
           tabs: const [
             Tab(text: 'Productos'),
-            Tab(text: 'Categorías'), 
-            Tab(text: 'Proveedores'),
+            Tab(text: 'Compras'), 
           ],
         ),
       ),
@@ -41,8 +39,7 @@ class _InventoryScreenState extends State<InventoryScreen> with SingleTickerProv
         controller: _tabController,
         children: [
           const ProductsScreen(),
-          const CategoryListScreen(),
-          const SupplierListScreen(),
+          const PurchasesScreen(),
         ],
       ),
     );
