@@ -6,8 +6,10 @@ import 'package:path_provider/path_provider.dart';
 import 'package:path/path.dart' as path;
 import 'package:ehstore_app/models/product.dart';
 import 'package:ehstore_app/models/category.dart';
+import 'package:ehstore_app/models/supplier.dart';
 import 'package:ehstore_app/services/product_service.dart';
 import 'package:ehstore_app/services/category_service.dart';
+import 'package:ehstore_app/services/supplier_service.dart';
 import 'package:ehstore_app/theme/app_theme.dart';
 
 class ProductFormScreen extends StatefulWidget {
@@ -41,22 +43,18 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
   
   bool _isLoading = false;
   bool _isLoadingCategories = true;
+  bool _isLoadingSuppliers = true;
   bool _isEditing = false;
 
   final _productService = ProductService();
   final _categoryService = CategoryService();
+  final _supplierService = SupplierService();
 
   // Mapeo de categorías para mostrar al usuario
   Map<String, String> _categoryMap = {};
 
   // Mapeo de proveedores para mostrar al usuario
-  final Map<String, String> _supplierMap = {
-    'samsung': 'Samsung Electronics',
-    'hp': 'HP Inc.',
-    'lg': 'LG Electronics',
-    'muebles_inc': 'Muebles Inc.',
-    'fashion_inc': 'Fashion Inc.',
-  };
+  Map<String, String> _supplierMap = {};
 
   @override
   void initState() {
@@ -64,6 +62,7 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
     _isEditing = widget.product != null;
     
     _loadCategories();
+    _loadSuppliers();
     
     if (_isEditing) {
       final product = widget.product!;
@@ -139,6 +138,58 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('Error al cargar categorías: $e'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
+  }
+
+  Future<void> _loadSuppliers() async {
+    try {
+      final suppliers = await _supplierService.getActiveSuppliers();
+      
+      if (suppliers.isEmpty) {
+        setState(() {
+          _supplierMap = {
+            'samsung': 'Samsung Electronics',
+            'hp': 'HP Inc.',
+            'lg': 'LG Electronics',
+            'muebles_inc': 'Muebles Inc.',
+            'fashion_inc': 'Fashion Inc.',
+          };
+          _isLoadingSuppliers = false;
+        });
+      } else {
+        final Map<String, String> supplierMap = {};
+        for (var supplier in suppliers) {
+          supplierMap[supplier.id] = supplier.businessName;
+        }
+        
+        setState(() {
+          _supplierMap = supplierMap;
+          _isLoadingSuppliers = false;
+          
+          // Verificar si el proveedor seleccionado existe y está activo
+          if (!_supplierMap.containsKey(_selectedSupplier) && _supplierMap.isNotEmpty) {
+            _selectedSupplier = _supplierMap.keys.first;
+          }
+        });
+      }
+    } catch (e) {
+      setState(() {
+        _supplierMap = {
+          'samsung': 'Samsung Electronics',
+          'hp': 'HP Inc.',
+          'lg': 'LG Electronics',
+          'muebles_inc': 'Muebles Inc.',
+          'fashion_inc': 'Fashion Inc.',
+        };
+        _isLoadingSuppliers = false;
+      });
+      
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Error al cargar proveedores: $e'),
           backgroundColor: Colors.red,
         ),
       );
@@ -256,26 +307,35 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
                     const SizedBox(height: 16),
 
                     // Proveedor
-                    DropdownButtonFormField<String>(
-                      value: _selectedSupplier,
-                      decoration: const InputDecoration(
-                        labelText: 'Proveedor',
-                        border: OutlineInputBorder(),
-                        prefixIcon: Icon(Icons.business_outlined),
-                      ),
-                      items: _supplierMap.entries
-                          .map((entry) => DropdownMenuItem(
-                                value: entry.key,
-                                child: Text(entry.value),
-                              ))
-                          .toList(),
-                      onChanged: (value) {
-                        if (value != null) {
-                          setState(() => _selectedSupplier = value);
-                        }
-                      },
-                      dropdownColor: Colors.white,
-                    ),
+                    _isLoadingSuppliers
+                        ? const Center(
+                            child: Padding(
+                              padding: EdgeInsets.symmetric(vertical: 16.0),
+                              child: CircularProgressIndicator(
+                                valueColor: AlwaysStoppedAnimation<Color>(AppTheme.primaryColor),
+                              ),
+                            ),
+                          )
+                        : DropdownButtonFormField<String>(
+                            value: _selectedSupplier,
+                            decoration: const InputDecoration(
+                              labelText: 'Proveedor',
+                              border: OutlineInputBorder(),
+                              prefixIcon: Icon(Icons.business_outlined),
+                            ),
+                            items: _supplierMap.entries
+                                .map((entry) => DropdownMenuItem(
+                                      value: entry.key,
+                                      child: Text(entry.value),
+                                    ))
+                                .toList(),
+                            onChanged: (value) {
+                              if (value != null) {
+                                setState(() => _selectedSupplier = value);
+                              }
+                            },
+                            dropdownColor: Colors.white,
+                          ),
                     const SizedBox(height: 24),
 
                     // Precio y Stock

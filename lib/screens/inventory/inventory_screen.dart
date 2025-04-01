@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:ehstore_app/theme/app_theme.dart';
 import 'products_screen.dart';
 import 'category_list_screen.dart';
+import 'supplier_list_screen.dart';
 
 class InventoryScreen extends StatefulWidget {
   const InventoryScreen({super.key});
@@ -41,37 +42,7 @@ class _InventoryScreenState extends State<InventoryScreen> with SingleTickerProv
         children: [
           const ProductsScreen(),
           const CategoryListScreen(),
-          _buildPlaceholder('Proveedores'),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildPlaceholder(String title) {
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(
-            Icons.business_outlined,
-            size: 64,
-            color: Colors.grey[400],
-          ),
-          const SizedBox(height: 16),
-          Text(
-            'Sección de $title en desarrollo',
-            style: const TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.w500,
-            ),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            'Próximamente podrás gestionar $title',
-            style: TextStyle(
-              color: Colors.grey[600],
-            ),
-          ),
+          const SupplierListScreen(),
         ],
       ),
     );

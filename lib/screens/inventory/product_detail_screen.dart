@@ -4,6 +4,9 @@ import 'package:ehstore_app/services/product_service.dart';
 import 'package:ehstore_app/theme/app_theme.dart';
 import 'product_form_screen.dart';
 import 'dart:io';
+import 'package:ehstore_app/services/supplier_service.dart';
+import 'package:ehstore_app/models/supplier.dart';
+import 'supplier_detail_screen.dart';
 
 class ProductDetailScreen extends StatefulWidget {
   final String productId;
@@ -19,9 +22,12 @@ class ProductDetailScreen extends StatefulWidget {
 
 class _ProductDetailScreenState extends State<ProductDetailScreen> {
   final ProductService _productService = ProductService();
+  final SupplierService _supplierService = SupplierService();
   late Future<Product?> _productFuture;
+  Supplier? _supplier;
   int _selectedImageIndex = 0;
   bool _isLoading = false;
+  bool _isLoadingSupplier = false;
 
   @override
   void initState() {
@@ -31,13 +37,45 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
 
   void _loadProduct() {
     _productFuture = _productService.getProductById(widget.productId);
+    _productFuture.then((product) {
+      if (product != null) {
+        _loadSupplier(product.supplierId);
+      }
+    });
+  }
+
+  Future<void> _loadSupplier(String supplierId) async {
+    setState(() {
+      _isLoadingSupplier = true;
+    });
+    
+    try {
+      final supplier = await _supplierService.getSupplierById(supplierId);
+      setState(() {
+        _supplier = supplier;
+        _isLoadingSupplier = false;
+      });
+    } catch (e) {
+      setState(() {
+        _isLoadingSupplier = false;
+      });
+      
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error al cargar datos del proveedor: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Detalle'),
+        title: const Text('Producto'),
         backgroundColor: AppTheme.backgroundColor,
         elevation: 0,
         iconTheme: const IconThemeData(color: Colors.black),
@@ -267,34 +305,84 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                       const SizedBox(height: 16),
                       
                       // Categoría
-                      Row(
-                        children: [
-                          const Icon(Icons.category_outlined, size: 18, color: Colors.grey),
-                          const SizedBox(width: 8),
-                          Text(
-                            _getCategoryName(product.categoryId),
-                            style: const TextStyle(
-                              color: Colors.grey,
-                              fontWeight: FontWeight.w500,
-                            ),
+                      InkWell(
+                        onTap: null, // Aquí podrías navegar a la pantalla de detalles de categoría si la tienes
+                        borderRadius: BorderRadius.circular(8),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                          decoration: BoxDecoration(
+                            color: Colors.grey[100],
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(color: Colors.grey[300]!),
                           ),
-                        ],
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              const Icon(
+                                Icons.category_outlined,
+                                size: 16,
+                                color: Colors.grey,
+                              ),
+                              const SizedBox(width: 4),
+                              Text(
+                                'Categoría: ${_getCategoryName(product.categoryId)}',
+                                style: const TextStyle(
+                                  fontSize: 14,
+                                  color: Colors.black87,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
                       ),
                       const SizedBox(height: 8),
                       
                       // Proveedor
-                      Row(
-                        children: [
-                          const Icon(Icons.business_outlined, size: 18, color: Colors.grey),
-                          const SizedBox(width: 8),
-                          Text(
-                            _getSupplierName(product.supplierId),
-                            style: const TextStyle(
-                              color: Colors.grey,
-                              fontWeight: FontWeight.w500,
-                            ),
+                      InkWell(
+                        onTap: _supplier != null 
+                            ? () => Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (context) => SupplierDetailScreen(supplierId: product.supplierId),
+                                ),
+                              )
+                            : null,
+                        borderRadius: BorderRadius.circular(8),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                          decoration: BoxDecoration(
+                            color: Colors.grey[100],
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(color: Colors.grey[300]!),
                           ),
-                        ],
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              const Icon(
+                                Icons.business_outlined,
+                                size: 16,
+                                color: Colors.grey,
+                              ),
+                              const SizedBox(width: 4),
+                              _isLoadingSupplier
+                                  ? const SizedBox(
+                                      width: 16,
+                                      height: 16,
+                                      child: CircularProgressIndicator(
+                                        strokeWidth: 2,
+                                        valueColor: AlwaysStoppedAnimation<Color>(AppTheme.primaryColor),
+                                      ),
+                                    )
+                                  : Text(
+                                      'Proveedor: ${_supplier?.businessName ?? _getDefaultSupplierName(product.supplierId)}',
+                                      style: const TextStyle(
+                                        fontSize: 14,
+                                        color: Colors.black87,
+                                      ),
+                                    ),
+                            ],
+                          ),
+                        ),
                       ),
                       
                       const Divider(height: 32),
@@ -498,7 +586,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
     return categories[categoryId] ?? categoryId;
   }
 
-  String _getSupplierName(String supplierId) {
+  String _getDefaultSupplierName(String supplierId) {
     final Map<String, String> suppliers = {
       'samsung': 'Samsung Electronics',
       'hp': 'HP Inc.',
@@ -506,6 +594,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
       'muebles_inc': 'Muebles Inc.',
       'fashion_inc': 'Fashion Inc.',
     };
+    
     return suppliers[supplierId] ?? supplierId;
   }
 

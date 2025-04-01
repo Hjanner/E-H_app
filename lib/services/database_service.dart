@@ -5,6 +5,7 @@ import 'package:path_provider/path_provider.dart';
 import 'dart:io';
 import '../models/product.dart';
 import '../models/category.dart';
+import '../models/supplier.dart';
 import 'package:flutter/material.dart';
 import 'package:uuid/uuid.dart';
 
@@ -27,7 +28,7 @@ class DatabaseService {
     String path = join(documentsDirectory.path, 'ehstore.db');
     return await openDatabase(
       path,
-      version: 2,
+      version: 4, // Incrementar versión para la nueva migración
       onCreate: _onCreate,
       onUpgrade: _onUpgrade,
     );
@@ -50,6 +51,30 @@ class DatabaseService {
     // Insertar categorías por defecto
     await _insertDefaultCategories(db);
     
+    // Tabla de proveedores
+    await db.execute('''
+      CREATE TABLE suppliers(
+        id TEXT PRIMARY KEY,
+        business_name TEXT NOT NULL,
+        legal_name TEXT NOT NULL,
+        tax_id TEXT NOT NULL,
+        address TEXT NOT NULL,
+        phone TEXT NOT NULL,
+        email TEXT NOT NULL,
+        contact_person TEXT NOT NULL,
+        is_active INTEGER NOT NULL,
+        notes TEXT NOT NULL,
+        instagram TEXT NOT NULL,
+        mercado_libre TEXT NOT NULL,
+        website TEXT NOT NULL,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL
+      )
+    ''');
+    
+    // Insertar proveedores por defecto
+    await _insertDefaultSuppliers(db);
+    
     // Tabla de productos
     await db.execute('''
       CREATE TABLE products(
@@ -63,7 +88,8 @@ class DatabaseService {
         supplier_id TEXT NOT NULL,
         created_at TEXT NOT NULL,
         updated_at TEXT NOT NULL,
-        FOREIGN KEY (category_id) REFERENCES categories (id) ON DELETE CASCADE
+        FOREIGN KEY (category_id) REFERENCES categories (id) ON DELETE CASCADE,
+        FOREIGN KEY (supplier_id) REFERENCES suppliers (id) ON DELETE RESTRICT
       )
     ''');
 
@@ -154,6 +180,154 @@ class DatabaseService {
       // Renombrar la tabla temporal como la tabla principal
       await db.execute('ALTER TABLE temp_products RENAME TO products');
     }
+    
+    if (oldVersion < 3) {
+      // Si la versión anterior es menor que 3, crear la tabla de proveedores
+      await db.execute('''
+        CREATE TABLE suppliers(
+          id TEXT PRIMARY KEY,
+          business_name TEXT NOT NULL,
+          legal_name TEXT NOT NULL,
+          tax_id TEXT NOT NULL,
+          address TEXT NOT NULL,
+          phone TEXT NOT NULL,
+          email TEXT NOT NULL,
+          contact_person TEXT NOT NULL,
+          is_active INTEGER NOT NULL,
+          notes TEXT NOT NULL,
+          instagram TEXT NOT NULL,
+          mercado_libre TEXT NOT NULL,
+          website TEXT NOT NULL,
+          created_at TEXT NOT NULL,
+          updated_at TEXT NOT NULL
+        )
+      ''');
+      
+      // Insertar proveedores por defecto
+      await _insertDefaultSuppliers(db);
+      
+      // Verificar si los productos tienen una relación con proveedores
+      final tableInfo = await db.rawQuery("PRAGMA table_info(products)");
+      
+      final hasSupplierIdColumn = tableInfo.any((column) => column['name'] == 'supplier_id');
+      
+      if (!hasSupplierIdColumn) {
+        // Si no existe la columna supplier_id, crear una tabla temporal para añadirla
+        await db.execute('''
+          CREATE TABLE temp_products(
+            id TEXT PRIMARY KEY,
+            name TEXT NOT NULL,
+            description TEXT NOT NULL,
+            price REAL NOT NULL,
+            current_stock INTEGER NOT NULL,
+            minimum_stock INTEGER NOT NULL,
+            category_id TEXT NOT NULL,
+            supplier_id TEXT NOT NULL,
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL,
+            FOREIGN KEY (category_id) REFERENCES categories (id) ON DELETE CASCADE,
+            FOREIGN KEY (supplier_id) REFERENCES suppliers (id) ON DELETE RESTRICT
+          )
+        ''');
+        
+        // Obtener los productos existentes
+        final List<Map<String, dynamic>> existingProducts = await db.query('products');
+        
+        // Insertar los productos en la tabla temporal, asignando un proveedor por defecto
+        for (var product in existingProducts) {
+          await db.insert(
+            'temp_products',
+            {
+              'id': product['id'],
+              'name': product['name'],
+              'description': product['description'],
+              'price': product['price'],
+              'current_stock': product['current_stock'],
+              'minimum_stock': product['minimum_stock'],
+              'category_id': product['category_id'],
+              'supplier_id': 'samsung', // Proveedor por defecto
+              'created_at': product['created_at'],
+              'updated_at': product['updated_at'],
+            },
+          );
+        }
+        
+        // Eliminar la tabla original
+        await db.execute('DROP TABLE products');
+        
+        // Renombrar la tabla temporal
+        await db.execute('ALTER TABLE temp_products RENAME TO products');
+      }
+      
+      // Actualizar la restricción de clave foránea de supplier_id si no existe
+      await db.execute('PRAGMA foreign_keys = ON');
+    }
+    
+    // Añadir migración para los nuevos campos
+    if (oldVersion < 4) {
+      // Verificar si existen las columnas de redes sociales y sitio web
+      final tableInfo = await db.rawQuery("PRAGMA table_info(suppliers)");
+      
+      final hasInstagramColumn = tableInfo.any((column) => column['name'] == 'instagram');
+      final hasMercadoLibreColumn = tableInfo.any((column) => column['name'] == 'mercado_libre');
+      final hasWebsiteColumn = tableInfo.any((column) => column['name'] == 'website');
+      
+      if (!hasInstagramColumn || !hasMercadoLibreColumn || !hasWebsiteColumn) {
+        // Si no existen las columnas, crear una tabla temporal con todos los campos
+        await db.execute('''
+          CREATE TABLE temp_suppliers(
+            id TEXT PRIMARY KEY,
+            business_name TEXT NOT NULL,
+            legal_name TEXT NOT NULL,
+            tax_id TEXT NOT NULL,
+            address TEXT NOT NULL,
+            phone TEXT NOT NULL,
+            email TEXT NOT NULL,
+            contact_person TEXT NOT NULL,
+            is_active INTEGER NOT NULL,
+            notes TEXT NOT NULL,
+            instagram TEXT NOT NULL,
+            mercado_libre TEXT NOT NULL,
+            website TEXT NOT NULL,
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL
+          )
+        ''');
+        
+        // Obtener los proveedores existentes
+        final List<Map<String, dynamic>> existingSuppliers = await db.query('suppliers');
+        
+        // Insertar los proveedores en la tabla temporal con valores por defecto para los nuevos campos
+        for (var supplier in existingSuppliers) {
+          await db.insert(
+            'temp_suppliers',
+            {
+              'id': supplier['id'],
+              'business_name': supplier['business_name'],
+              'legal_name': supplier['legal_name'],
+              'tax_id': supplier['tax_id'],
+              'address': supplier['address'],
+              'phone': supplier['phone'],
+              'email': supplier['email'],
+              'contact_person': supplier['contact_person'],
+              'is_active': supplier['is_active'],
+              'notes': supplier['notes'],
+              'instagram': '', // Valor por defecto vacío
+              'mercado_libre': '', // Valor por defecto vacío
+              'website': '', // Valor por defecto vacío
+              'created_at': supplier['created_at'],
+              'updated_at': supplier['updated_at'],
+            },
+          );
+        }
+        
+        // Eliminar la tabla original
+        await db.execute('DROP TABLE suppliers');
+        
+        // Renombrar la tabla temporal
+        await db.execute('ALTER TABLE temp_suppliers RENAME TO suppliers');
+      }
+    }
   }
 
   Future<void> _insertDefaultCategories(Database db) async {
@@ -189,6 +363,105 @@ class DatabaseService {
       'description': 'Prendas de vestir para hombres, mujeres y niños',
       'icon': Category.iconToString(Icons.checkroom),
       'color': Category.colorToString(const Color(0xFFF44336)), // Rojo
+      'created_at': now,
+      'updated_at': now,
+    });
+  }
+
+  Future<void> _insertDefaultSuppliers(Database db) async {
+    final now = DateTime.now().toIso8601String();
+
+    // Samsung Electronics
+    await db.insert('suppliers', {
+      'id': 'samsung',
+      'business_name': 'Samsung Electronics',
+      'legal_name': 'Samsung Electronics Co., Ltd.',
+      'tax_id': 'J-123456789',
+      'address': 'Suwon, Corea del Sur',
+      'phone': '+82 31 200 3000',
+      'email': 'contacto@samsung.com',
+      'contact_person': 'John Smith',
+      'is_active': 1,
+      'notes': 'Proveedor principal de electrónica',
+      'instagram': '@samsunglatam',
+      'mercado_libre': 'samsung_official',
+      'website': 'https://www.samsung.com',
+      'created_at': now,
+      'updated_at': now,
+    });
+
+    // HP Inc.
+    await db.insert('suppliers', {
+      'id': 'hp',
+      'business_name': 'HP Inc.',
+      'legal_name': 'HP Inc.',
+      'tax_id': 'J-987654321',
+      'address': 'Palo Alto, California, USA',
+      'phone': '+1 650 857 1501',
+      'email': 'contacto@hp.com',
+      'contact_person': 'Maria Rodriguez',
+      'is_active': 1,
+      'notes': 'Proveedor de computadoras e impresoras',
+      'instagram': '@hp',
+      'mercado_libre': 'hp_store',
+      'website': 'https://www.hp.com',
+      'created_at': now,
+      'updated_at': now,
+    });
+
+    // LG Electronics
+    await db.insert('suppliers', {
+      'id': 'lg',
+      'business_name': 'LG Electronics',
+      'legal_name': 'LG Electronics Inc.',
+      'tax_id': 'J-567890123',
+      'address': 'Seúl, Corea del Sur',
+      'phone': '+82 2 3777 1114',
+      'email': 'contacto@lg.com',
+      'contact_person': 'Carlos Lee',
+      'is_active': 1,
+      'notes': 'Proveedor de electrodomésticos y electrónica',
+      'instagram': '@lg',
+      'mercado_libre': 'lg_oficial',
+      'website': 'https://www.lg.com',
+      'created_at': now,
+      'updated_at': now,
+    });
+
+    // Muebles Inc.
+    await db.insert('suppliers', {
+      'id': 'muebles_inc',
+      'business_name': 'Muebles Inc.',
+      'legal_name': 'Muebles Internacionales C.A.',
+      'tax_id': 'J-456789012',
+      'address': 'Valencia, Venezuela',
+      'phone': '+58 241 555 1234',
+      'email': 'contacto@mueblesinc.com',
+      'contact_person': 'Ana Martínez',
+      'is_active': 1,
+      'notes': 'Proveedor de muebles para el hogar',
+      'instagram': '@muebles_inc',
+      'mercado_libre': 'muebles_inc',
+      'website': 'https://www.mueblesinc.com',
+      'created_at': now,
+      'updated_at': now,
+    });
+
+    // Fashion Inc.
+    await db.insert('suppliers', {
+      'id': 'fashion_inc',
+      'business_name': 'Fashion Inc.',
+      'legal_name': 'Fashion Incorporated S.A.',
+      'tax_id': 'J-654321098',
+      'address': 'Caracas, Venezuela',
+      'phone': '+58 212 555 6789',
+      'email': 'contacto@fashioninc.com',
+      'contact_person': 'Laura Pérez',
+      'is_active': 1,
+      'notes': 'Proveedor de ropa y accesorios',
+      'instagram': '@fashion_inc_ve',
+      'mercado_libre': 'fashion_inc',
+      'website': 'https://www.fashioninc.com',
       'created_at': now,
       'updated_at': now,
     });
@@ -300,6 +573,254 @@ class DatabaseService {
       'products',
       where: 'category_id = ?',
       whereArgs: [categoryId],
+    );
+    
+    if (productMaps.isEmpty) {
+      return [];
+    }
+
+    List<Product> products = [];
+    for (var productMap in productMaps) {
+      // Obtener las URLs de imágenes para este producto
+      final List<Map<String, dynamic>> imageMaps = await db.query(
+        'product_images',
+        where: 'product_id = ?',
+        whereArgs: [productMap['id']],
+      );
+      List<String> imageUrls = imageMaps.map((img) => img['image_url'] as String).toList();
+
+      // Obtener las especificaciones para este producto
+      final List<Map<String, dynamic>> specMaps = await db.query(
+        'product_specifications',
+        where: 'product_id = ?',
+        whereArgs: [productMap['id']],
+      );
+      Map<String, dynamic> specifications = {};
+      for (var spec in specMaps) {
+        specifications[spec['specification_key']] = spec['specification_value'];
+      }
+
+      // Crear el objeto Product
+      products.add(Product(
+        id: productMap['id'],
+        name: productMap['name'],
+        description: productMap['description'],
+        price: productMap['price'],
+        currentStock: productMap['current_stock'],
+        minimumStock: productMap['minimum_stock'],
+        categoryId: productMap['category_id'],
+        supplierId: productMap['supplier_id'],
+        imageUrls: imageUrls,
+        specifications: specifications,
+        createdAt: DateTime.parse(productMap['created_at']),
+        updatedAt: DateTime.parse(productMap['updated_at']),
+      ));
+    }
+
+    return products;
+  }
+
+  // MÉTODOS PARA PROVEEDORES
+
+  Future<List<Supplier>> getAllSuppliers() async {
+    final db = await database;
+    final List<Map<String, dynamic>> supplierMaps = await db.query('suppliers');
+    
+    if (supplierMaps.isEmpty) {
+      return [];
+    }
+
+    return supplierMaps.map((supplierMap) => Supplier(
+      id: supplierMap['id'],
+      businessName: supplierMap['business_name'],
+      legalName: supplierMap['legal_name'],
+      taxId: supplierMap['tax_id'],
+      address: supplierMap['address'],
+      phone: supplierMap['phone'],
+      email: supplierMap['email'],
+      contactPerson: supplierMap['contact_person'],
+      isActive: supplierMap['is_active'] == 1,
+      notes: supplierMap['notes'],
+      instagram: supplierMap['instagram'] ?? '',
+      mercadoLibre: supplierMap['mercado_libre'] ?? '',
+      website: supplierMap['website'] ?? '',
+      createdAt: DateTime.parse(supplierMap['created_at']),
+      updatedAt: DateTime.parse(supplierMap['updated_at']),
+    )).toList();
+  }
+
+  Future<Supplier?> getSupplierById(String id) async {
+    final db = await database;
+    final List<Map<String, dynamic>> supplierMaps = await db.query(
+      'suppliers',
+      where: 'id = ?',
+      whereArgs: [id],
+    );
+    
+    if (supplierMaps.isEmpty) {
+      return null;
+    }
+
+    return Supplier(
+      id: supplierMaps.first['id'],
+      businessName: supplierMaps.first['business_name'],
+      legalName: supplierMaps.first['legal_name'],
+      taxId: supplierMaps.first['tax_id'],
+      address: supplierMaps.first['address'],
+      phone: supplierMaps.first['phone'],
+      email: supplierMaps.first['email'],
+      contactPerson: supplierMaps.first['contact_person'],
+      isActive: supplierMaps.first['is_active'] == 1,
+      notes: supplierMaps.first['notes'],
+      instagram: supplierMaps.first['instagram'] ?? '',
+      mercadoLibre: supplierMaps.first['mercado_libre'] ?? '',
+      website: supplierMaps.first['website'] ?? '',
+      createdAt: DateTime.parse(supplierMaps.first['created_at']),
+      updatedAt: DateTime.parse(supplierMaps.first['updated_at']),
+    );
+  }
+
+  Future<int> insertSupplier(Supplier supplier) async {
+    final db = await database;
+    return await db.insert(
+      'suppliers',
+      {
+        'id': supplier.id,
+        'business_name': supplier.businessName,
+        'legal_name': supplier.legalName,
+        'tax_id': supplier.taxId,
+        'address': supplier.address,
+        'phone': supplier.phone,
+        'email': supplier.email,
+        'contact_person': supplier.contactPerson,
+        'is_active': supplier.isActive ? 1 : 0,
+        'notes': supplier.notes,
+        'instagram': supplier.instagram,
+        'mercado_libre': supplier.mercadoLibre,
+        'website': supplier.website,
+        'created_at': supplier.createdAt.toIso8601String(),
+        'updated_at': supplier.updatedAt.toIso8601String(),
+      },
+      conflictAlgorithm: ConflictAlgorithm.replace,
+    );
+  }
+
+  Future<int> updateSupplier(Supplier supplier) async {
+    final db = await database;
+    return await db.update(
+      'suppliers',
+      {
+        'business_name': supplier.businessName,
+        'legal_name': supplier.legalName,
+        'tax_id': supplier.taxId,
+        'address': supplier.address,
+        'phone': supplier.phone,
+        'email': supplier.email,
+        'contact_person': supplier.contactPerson,
+        'is_active': supplier.isActive ? 1 : 0,
+        'notes': supplier.notes,
+        'instagram': supplier.instagram,
+        'mercado_libre': supplier.mercadoLibre,
+        'website': supplier.website,
+        'updated_at': supplier.updatedAt.toIso8601String(),
+      },
+      where: 'id = ?',
+      whereArgs: [supplier.id],
+    );
+  }
+
+  Future<int> deleteSupplier(String id) async {
+    final db = await database;
+    
+    // Verificar si hay productos asociados a este proveedor
+    final List<Map<String, dynamic>> productMaps = await db.query(
+      'products',
+      where: 'supplier_id = ?',
+      whereArgs: [id],
+    );
+    
+    if (productMaps.isNotEmpty) {
+      // Si hay productos asociados, no permitir la eliminación
+      return 0;
+    }
+    
+    return await db.delete(
+      'suppliers',
+      where: 'id = ?',
+      whereArgs: [id],
+    );
+  }
+
+  Future<List<Supplier>> getSuppliersByStatus(bool isActive) async {
+    final db = await database;
+    final List<Map<String, dynamic>> supplierMaps = await db.query(
+      'suppliers',
+      where: 'is_active = ?',
+      whereArgs: [isActive ? 1 : 0],
+    );
+    
+    if (supplierMaps.isEmpty) {
+      return [];
+    }
+
+    return supplierMaps.map((supplierMap) => Supplier(
+      id: supplierMap['id'],
+      businessName: supplierMap['business_name'],
+      legalName: supplierMap['legal_name'],
+      taxId: supplierMap['tax_id'],
+      address: supplierMap['address'],
+      phone: supplierMap['phone'],
+      email: supplierMap['email'],
+      contactPerson: supplierMap['contact_person'],
+      isActive: supplierMap['is_active'] == 1,
+      notes: supplierMap['notes'],
+      instagram: supplierMap['instagram'] ?? '',
+      mercadoLibre: supplierMap['mercado_libre'] ?? '',
+      website: supplierMap['website'] ?? '',
+      createdAt: DateTime.parse(supplierMap['created_at']),
+      updatedAt: DateTime.parse(supplierMap['updated_at']),
+    )).toList();
+  }
+
+  Future<List<Supplier>> searchSuppliers(String query) async {
+    final db = await database;
+    
+    final List<Map<String, dynamic>> supplierMaps = await db.query(
+      'suppliers',
+      where: 'business_name LIKE ? OR legal_name LIKE ? OR contact_person LIKE ?',
+      whereArgs: ['%$query%', '%$query%', '%$query%'],
+    );
+    
+    if (supplierMaps.isEmpty) {
+      return [];
+    }
+
+    return supplierMaps.map((supplierMap) => Supplier(
+      id: supplierMap['id'],
+      businessName: supplierMap['business_name'],
+      legalName: supplierMap['legal_name'],
+      taxId: supplierMap['tax_id'],
+      address: supplierMap['address'],
+      phone: supplierMap['phone'],
+      email: supplierMap['email'],
+      contactPerson: supplierMap['contact_person'],
+      isActive: supplierMap['is_active'] == 1,
+      notes: supplierMap['notes'],
+      instagram: supplierMap['instagram'] ?? '',
+      mercadoLibre: supplierMap['mercado_libre'] ?? '',
+      website: supplierMap['website'] ?? '',
+      createdAt: DateTime.parse(supplierMap['created_at']),
+      updatedAt: DateTime.parse(supplierMap['updated_at']),
+    )).toList();
+  }
+
+  // Método para obtener los productos de un proveedor específico
+  Future<List<Product>> getProductsBySupplier(String supplierId) async {
+    final db = await database;
+    final List<Map<String, dynamic>> productMaps = await db.query(
+      'products',
+      where: 'supplier_id = ?',
+      whereArgs: [supplierId],
     );
     
     if (productMaps.isEmpty) {
