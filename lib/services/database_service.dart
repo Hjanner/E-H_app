@@ -6,6 +6,7 @@ import 'dart:io';
 import '../models/product.dart';
 import '../models/category.dart';
 import '../models/supplier.dart';
+import '../models/customer.dart';
 import 'package:flutter/material.dart';
 import 'package:uuid/uuid.dart';
 
@@ -28,7 +29,7 @@ class DatabaseService {
     String path = join(documentsDirectory.path, 'ehstore.db');
     return await openDatabase(
       path,
-      version: 4, // Incrementar versión para la nueva migración
+      version: 5, // Incrementar versión para la nueva migración
       onCreate: _onCreate,
       onUpgrade: _onUpgrade,
     );
@@ -74,6 +75,27 @@ class DatabaseService {
     
     // Insertar proveedores por defecto
     await _insertDefaultSuppliers(db);
+    
+    // Tabla de clientes
+    await db.execute('''
+      CREATE TABLE customers(
+        id TEXT PRIMARY KEY,
+        first_name TEXT NOT NULL,
+        last_name TEXT NOT NULL,
+        email TEXT NOT NULL,
+        phone TEXT NOT NULL,
+        address TEXT NOT NULL,
+        notes TEXT NOT NULL,
+        document_id TEXT NOT NULL,
+        document_type TEXT NOT NULL,
+        is_active INTEGER NOT NULL,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL
+      )
+    ''');
+    
+    // Insertar clientes por defecto
+    await _insertDefaultCustomers(db);
     
     // Tabla de productos
     await db.execute('''
@@ -328,6 +350,30 @@ class DatabaseService {
         await db.execute('ALTER TABLE temp_suppliers RENAME TO suppliers');
       }
     }
+    
+    // Migración para añadir la tabla de clientes
+    if (oldVersion < 5) {
+      // Tabla de clientes
+      await db.execute('''
+        CREATE TABLE customers(
+          id TEXT PRIMARY KEY,
+          first_name TEXT NOT NULL,
+          last_name TEXT NOT NULL,
+          email TEXT NOT NULL,
+          phone TEXT NOT NULL,
+          address TEXT NOT NULL,
+          notes TEXT NOT NULL,
+          document_id TEXT NOT NULL,
+          document_type TEXT NOT NULL,
+          is_active INTEGER NOT NULL,
+          created_at TEXT NOT NULL,
+          updated_at TEXT NOT NULL
+        )
+      ''');
+      
+      // Insertar clientes por defecto
+      await _insertDefaultCustomers(db);
+    }
   }
 
   Future<void> _insertDefaultCategories(Database db) async {
@@ -462,6 +508,59 @@ class DatabaseService {
       'instagram': '@fashion_inc_ve',
       'mercado_libre': 'fashion_inc',
       'website': 'https://www.fashioninc.com',
+      'created_at': now,
+      'updated_at': now,
+    });
+  }
+
+  Future<void> _insertDefaultCustomers(Database db) async {
+    final now = DateTime.now().toIso8601String();
+    final uuid = Uuid();
+
+    // Cliente 1
+    await db.insert('customers', {
+      'id': uuid.v4(),
+      'first_name': 'Juan',
+      'last_name': 'Pérez',
+      'email': 'juan.perez@example.com',
+      'phone': '+58 414 555 1234',
+      'address': 'Calle Principal 123, Caracas',
+      'notes': 'Cliente frecuente, compra productos electrónicos',
+      'document_id': 'V-12345678',
+      'document_type': 'Cédula',
+      'is_active': 1,
+      'created_at': now,
+      'updated_at': now,
+    });
+
+    // Cliente 2
+    await db.insert('customers', {
+      'id': uuid.v4(),
+      'first_name': 'María',
+      'last_name': 'González',
+      'email': 'maria.gonzalez@example.com',
+      'phone': '+58 412 555 9876',
+      'address': 'Avenida Libertador 456, Valencia',
+      'notes': 'Prefiere pagos en efectivo',
+      'document_id': 'V-87654321',
+      'document_type': 'Cédula',
+      'is_active': 1,
+      'created_at': now,
+      'updated_at': now,
+    });
+
+    // Cliente 3
+    await db.insert('customers', {
+      'id': uuid.v4(),
+      'first_name': 'Empresa',
+      'last_name': 'ABC',
+      'email': 'contacto@empresaabc.com',
+      'phone': '+58 212 555 4321',
+      'address': 'Zona Industrial, Galpón 7, Maracay',
+      'notes': 'Cliente corporativo, solicita facturas fiscales',
+      'document_id': 'J-29876543',
+      'document_type': 'RIF',
+      'is_active': 1,
       'created_at': now,
       'updated_at': now,
     });
@@ -1227,5 +1326,172 @@ class DatabaseService {
     }
 
     return products;
+  }
+
+  // MÉTODOS PARA CLIENTES
+
+  Future<List<Customer>> getAllCustomers() async {
+    final db = await database;
+    final List<Map<String, dynamic>> customerMaps = await db.query('customers');
+    
+    if (customerMaps.isEmpty) {
+      return [];
+    }
+
+    return customerMaps.map((customerMap) => Customer(
+      id: customerMap['id'],
+      firstName: customerMap['first_name'],
+      lastName: customerMap['last_name'],
+      email: customerMap['email'],
+      phone: customerMap['phone'],
+      address: customerMap['address'],
+      notes: customerMap['notes'],
+      documentId: customerMap['document_id'],
+      documentType: customerMap['document_type'],
+      isActive: customerMap['is_active'] == 1,
+      createdAt: DateTime.parse(customerMap['created_at']),
+      updatedAt: DateTime.parse(customerMap['updated_at']),
+    )).toList();
+  }
+
+  // Obtener clientes activos
+  Future<List<Customer>> getActiveCustomers() async {
+    final db = await database;
+    final List<Map<String, dynamic>> customerMaps = await db.query(
+      'customers',
+      where: 'is_active = ?',
+      whereArgs: [1],
+    );
+    
+    if (customerMaps.isEmpty) {
+      return [];
+    }
+
+    return customerMaps.map((customerMap) => Customer(
+      id: customerMap['id'],
+      firstName: customerMap['first_name'],
+      lastName: customerMap['last_name'],
+      email: customerMap['email'],
+      phone: customerMap['phone'],
+      address: customerMap['address'],
+      notes: customerMap['notes'],
+      documentId: customerMap['document_id'],
+      documentType: customerMap['document_type'],
+      isActive: customerMap['is_active'] == 1,
+      createdAt: DateTime.parse(customerMap['created_at']),
+      updatedAt: DateTime.parse(customerMap['updated_at']),
+    )).toList();
+  }
+
+  Future<Customer?> getCustomerById(String id) async {
+    final db = await database;
+    final List<Map<String, dynamic>> customerMaps = await db.query(
+      'customers',
+      where: 'id = ?',
+      whereArgs: [id],
+    );
+    
+    if (customerMaps.isEmpty) {
+      return null;
+    }
+
+    return Customer(
+      id: customerMaps.first['id'],
+      firstName: customerMaps.first['first_name'],
+      lastName: customerMaps.first['last_name'],
+      email: customerMaps.first['email'],
+      phone: customerMaps.first['phone'],
+      address: customerMaps.first['address'],
+      notes: customerMaps.first['notes'],
+      documentId: customerMaps.first['document_id'],
+      documentType: customerMaps.first['document_type'],
+      isActive: customerMaps.first['is_active'] == 1,
+      createdAt: DateTime.parse(customerMaps.first['created_at']),
+      updatedAt: DateTime.parse(customerMaps.first['updated_at']),
+    );
+  }
+
+  Future<int> insertCustomer(Customer customer) async {
+    final db = await database;
+    return await db.insert(
+      'customers',
+      {
+        'id': customer.id,
+        'first_name': customer.firstName,
+        'last_name': customer.lastName,
+        'email': customer.email,
+        'phone': customer.phone,
+        'address': customer.address,
+        'notes': customer.notes,
+        'document_id': customer.documentId,
+        'document_type': customer.documentType,
+        'is_active': customer.isActive ? 1 : 0,
+        'created_at': customer.createdAt.toIso8601String(),
+        'updated_at': customer.updatedAt.toIso8601String(),
+      },
+      conflictAlgorithm: ConflictAlgorithm.replace,
+    );
+  }
+
+  Future<int> updateCustomer(Customer customer) async {
+    final db = await database;
+    return await db.update(
+      'customers',
+      {
+        'first_name': customer.firstName,
+        'last_name': customer.lastName,
+        'email': customer.email,
+        'phone': customer.phone,
+        'address': customer.address,
+        'notes': customer.notes,
+        'document_id': customer.documentId,
+        'document_type': customer.documentType,
+        'is_active': customer.isActive ? 1 : 0,
+        'updated_at': customer.updatedAt.toIso8601String(),
+      },
+      where: 'id = ?',
+      whereArgs: [customer.id],
+    );
+  }
+
+  Future<int> deleteCustomer(String id) async {
+    final db = await database;
+    
+    // Aquí se puede agregar lógica para verificar si hay ventas asociadas a este cliente
+    
+    return await db.delete(
+      'customers',
+      where: 'id = ?',
+      whereArgs: [id],
+    );
+  }
+
+  Future<List<Customer>> searchCustomers(String query) async {
+    final db = await database;
+    
+    final List<Map<String, dynamic>> customerMaps = await db.query(
+      'customers',
+      where: 'first_name LIKE ? OR last_name LIKE ? OR document_id LIKE ?',
+      whereArgs: ['%$query%', '%$query%', '%$query%'],
+    );
+    
+    if (customerMaps.isEmpty) {
+      return [];
+    }
+
+    return customerMaps.map((customerMap) => Customer(
+      id: customerMap['id'],
+      firstName: customerMap['first_name'],
+      lastName: customerMap['last_name'],
+      email: customerMap['email'],
+      phone: customerMap['phone'],
+      address: customerMap['address'],
+      notes: customerMap['notes'],
+      documentId: customerMap['document_id'],
+      documentType: customerMap['document_type'],
+      isActive: customerMap['is_active'] == 1,
+      createdAt: DateTime.parse(customerMap['created_at']),
+      updatedAt: DateTime.parse(customerMap['updated_at']),
+    )).toList();
   }
 } 

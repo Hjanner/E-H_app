@@ -3,6 +3,9 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 import 'package:ehstore_app/screens/home_screen.dart';
 import 'package:ehstore_app/theme/app_theme.dart';
+import 'package:ehstore_app/screens/customers/customer_list_screen.dart';
+import 'package:ehstore_app/screens/customers/customer_detail_screen.dart';
+import 'package:ehstore_app/screens/customers/customer_form_screen.dart';
 import 'screens/inventory/products_screen.dart';
 
 void main() {
@@ -19,6 +22,23 @@ class MyApp extends StatelessWidget {
       debugShowCheckedModeBanner: false,
       theme: AppTheme.theme,
       home: const HomeScreen(),
+      routes: {
+        // Rutas para clientes
+        '/customer_list': (context) => const CustomerListScreen(),
+        '/customer_form': (context) => CustomerFormScreen(
+              customer: ModalRoute.of(context)?.settings.arguments as dynamic,
+            ),
+      },
+      onGenerateRoute: (settings) {
+        if (settings.name == '/customer_detail') {
+          return MaterialPageRoute(
+            builder: (context) => CustomerDetailScreen(
+              customerId: settings.arguments as String,
+            ),
+          );
+        }
+        return null;
+      },
     );
   }
 }

@@ -27,7 +27,7 @@ class ProductCard extends StatelessWidget {
         onTap: onTap,
         borderRadius: BorderRadius.circular(15),
         child: Container(
-          padding: const EdgeInsets.all(12),
+          padding: const EdgeInsets.all(8),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -36,7 +36,7 @@ class ProductCard extends StatelessWidget {
               ClipRRect(
                 borderRadius: BorderRadius.circular(12),
                 child: Container(
-                  height: 100,
+                  height: showPrice ? 100 : 80,
                   width: double.infinity,
                   color: Colors.grey[200],
                   child: product.imageUrls.isNotEmpty
@@ -50,15 +50,15 @@ class ProductCard extends StatelessWidget {
                         ),
                 ),
               ),
-              const SizedBox(height: 6),
+              const SizedBox(height: 8),
               
               // Nombre del producto
               SizedBox(
-                height: 40, // Altura fija para 2 líneas de texto
+                height: showPrice ? 40 : 40,
                 child: Text(
                   product.name,
-                  style: const TextStyle(
-                    fontSize: 15,
+                  style: TextStyle(
+                    fontSize: showPrice ? 15 : 15,
                     fontWeight: FontWeight.bold,
                     height: 1.2,
                   ),
@@ -68,7 +68,7 @@ class ProductCard extends StatelessWidget {
               ),
               
               // Precio (opcional)
-              if (showPrice)
+              if (showPrice) ...[
                 Text(
                   '\$${product.price.toStringAsFixed(2)}',
                   style: TextStyle(
@@ -77,7 +77,8 @@ class ProductCard extends StatelessWidget {
                     fontWeight: FontWeight.w600,
                   ),
                 ),
-              const SizedBox(height: 4),
+                const SizedBox(height: 6),
+              ],
               
               // Stock
               Row(
@@ -91,7 +92,7 @@ class ProductCard extends StatelessWidget {
                   Text(
                     'Stock: ${product.currentStock}',
                     style: TextStyle(
-                      fontSize: 13,
+                      fontSize: 12,
                       color: product.isLowStock ? Colors.red : Colors.grey[600],
                     ),
                   ),

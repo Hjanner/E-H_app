@@ -10,8 +10,8 @@ class QuickActionGrid extends StatelessWidget {
       shrinkWrap: true,
       physics: const NeverScrollableScrollPhysics(),
       crossAxisCount: 2,
-      mainAxisSpacing: 16,
-      crossAxisSpacing: 16,
+      mainAxisSpacing: 14,
+      crossAxisSpacing: 14,
       childAspectRatio: 1.5,
       children: [
         _QuickActionCard(

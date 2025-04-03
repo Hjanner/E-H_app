@@ -124,9 +124,9 @@ class _HomeScreenState extends State<HomeScreen> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           const BalanceCard(),
-          const SizedBox(height: 16),
+          const SizedBox(height: 18),
           const QuickActionGrid(),
-          const SizedBox(height: 16),
+          const SizedBox(height: 18),
           _isLoading
             ? const Center(
                 child: Padding(
@@ -136,9 +136,11 @@ class _HomeScreenState extends State<HomeScreen> {
                   ),
                 ),
               )
-            : AlertSection(
-                title: 'Alerta de Stock bajo',
-                items: _lowStockProducts,
+            : Expanded(
+                child: AlertSection(
+                  title: 'Alerta de Stock bajo',
+                  items: _lowStockProducts,
+                ),
               ),
         ],
       ),

@@ -5,6 +5,7 @@ import 'package:ehstore_app/widgets/product_card.dart';
 import 'package:ehstore_app/theme/app_theme.dart';
 import 'product_form_screen.dart';
 import 'product_detail_screen.dart';
+import 'package:ehstore_app/services/category_service.dart';
 
 class ProductsScreen extends StatefulWidget {
   const ProductsScreen({super.key});
@@ -15,8 +16,11 @@ class ProductsScreen extends StatefulWidget {
 
 class _ProductsScreenState extends State<ProductsScreen> {
   final ProductService _productService = ProductService();
+  final CategoryService _categoryService = CategoryService();
   List<Product> _products = [];
+  Map<String, String> _categoryMap = {};
   bool _isLoading = true;
+  bool _isLoadingCategories = true;
   String _searchQuery = '';
   String _selectedCategory = 'all';
   bool _showLowStockOnly = false;
@@ -24,7 +28,38 @@ class _ProductsScreenState extends State<ProductsScreen> {
   @override
   void initState() {
     super.initState();
+    _loadCategories();
     _loadProducts();
+  }
+
+  Future<void> _loadCategories() async {
+    try {
+      final categories = await _categoryService.getAllCategories();
+      
+      final Map<String, String> categoryMap = {'all': 'Todas'};
+      for (var category in categories) {
+        categoryMap[category.id] = category.name;
+      }
+      
+      setState(() {
+        _categoryMap = categoryMap;
+        _isLoadingCategories = false;
+      });
+    } catch (e) {
+      setState(() {
+        _categoryMap = {'all': 'Todas'};
+        _isLoadingCategories = false;
+      });
+      
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error al cargar categorías: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
   }
 
   Future<void> _loadProducts() async {
@@ -130,49 +165,43 @@ class _ProductsScreenState extends State<ProductsScreen> {
                     children: [
                       // Categorías
                       Expanded(
-                        child: DropdownButtonFormField<String>(
-                          value: _selectedCategory,
-                          decoration: InputDecoration(
-                            labelText: 'Categoría',
-                            labelStyle: TextStyle(color: AppTheme.primaryColor),
-                            contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                            border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            focusedBorder: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(12),
-                              borderSide: const BorderSide(color: AppTheme.primaryColor),
-                            ),
-                          ),
-                          items: const [
-                            DropdownMenuItem(
-                              value: 'all',
-                              child: Text('Todas'),
-                            ),
-                            DropdownMenuItem(
-                              value: 'electrónica',
-                              child: Text('Electrónica'),
-                            ),
-                            DropdownMenuItem(
-                              value: 'hogar',
-                              child: Text('Hogar'),
-                            ),
-                            DropdownMenuItem(
-                              value: 'ropa',
-                              child: Text('Ropa'),
-                            ),
-                          ],
-                          onChanged: (value) {
-                            if (value != null) {
-                              setState(() {
-                                _selectedCategory = value;
-                              });
-                              _filterProducts();
-                            }
-                          },
-                          dropdownColor: AppTheme.backgroundColor,
-                          icon: const Icon(Icons.arrow_drop_down, color: AppTheme.primaryColor),
-                        ),
+                        child: _isLoadingCategories
+                            ? const Center(
+                                child: CircularProgressIndicator(
+                                  valueColor: AlwaysStoppedAnimation<Color>(AppTheme.primaryColor),
+                                ),
+                              )
+                            : DropdownButtonFormField<String>(
+                                value: _selectedCategory,
+                                decoration: InputDecoration(
+                                  labelText: 'Categoría',
+                                  labelStyle: TextStyle(color: AppTheme.primaryColor),
+                                  contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                                  border: OutlineInputBorder(
+                                    borderRadius: BorderRadius.circular(12),
+                                  ),
+                                  focusedBorder: OutlineInputBorder(
+                                    borderRadius: BorderRadius.circular(12),
+                                    borderSide: const BorderSide(color: AppTheme.primaryColor),
+                                  ),
+                                ),
+                                items: _categoryMap.entries
+                                    .map((entry) => DropdownMenuItem(
+                                          value: entry.key,
+                                          child: Text(entry.value),
+                                        ))
+                                    .toList(),
+                                onChanged: (value) {
+                                  if (value != null) {
+                                    setState(() {
+                                      _selectedCategory = value;
+                                    });
+                                    _filterProducts();
+                                  }
+                                },
+                                dropdownColor: AppTheme.backgroundColor,
+                                icon: const Icon(Icons.arrow_drop_down, color: AppTheme.primaryColor),
+                              ),
                       ),
                       const SizedBox(width: 8),
                       // Stock bajo
