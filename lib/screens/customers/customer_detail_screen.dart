@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:ehstore_app/models/customer.dart';
 import 'package:ehstore_app/services/customer_service.dart';
 import 'package:ehstore_app/theme/app_theme.dart';
@@ -154,6 +155,24 @@ class _CustomerDetailScreenState extends State<CustomerDetailScreen> {
     });
   }
 
+  // Copiar número de teléfono al portapapeles
+  Future<void> _copyPhoneNumber() async {
+    if (_customer == null) return;
+    
+    await Clipboard.setData(ClipboardData(text: _customer!.phone));
+    
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Número de teléfono copiado al portapapeles'),
+          backgroundColor: Colors.green,
+          duration: Duration(seconds: 1),
+        ),
+      );
+    }
+  }
+
+  // Realizar llamada telefónica
   Future<void> _callCustomer() async {
     if (_customer == null) return;
     
@@ -165,6 +184,39 @@ class _CustomerDetailScreenState extends State<CustomerDetailScreen> {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('No se pudo realizar la llamada'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
+  // Enviar mensaje de WhatsApp
+  Future<void> _sendWhatsAppMessage() async {
+    if (_customer == null) return;
+    
+    // Limpiar el número de teléfono (eliminar espacios, paréntesis, etc.)
+    String cleanPhone = _customer!.phone.replaceAll(RegExp(r'\s+|\(|\)|\-'), '');
+    
+    // Si no comienza con +, agregamos el código de país (asumiendo Venezuela +58)
+    if (!cleanPhone.startsWith('+')) {
+      // Si comienza con 0, lo reemplazamos por +58
+      if (cleanPhone.startsWith('0')) {
+        cleanPhone = '+58${cleanPhone.substring(1)}';
+      } else {
+        cleanPhone = '+58$cleanPhone';
+      }
+    }
+    
+    final url = 'https://wa.me/$cleanPhone';
+    
+    if (await canLaunchUrl(Uri.parse(url))) {
+      await launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication);
+    } else {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('No se pudo abrir WhatsApp'),
             backgroundColor: Colors.red,
           ),
         );
@@ -259,31 +311,31 @@ class _CustomerDetailScreenState extends State<CustomerDetailScreen> {
                                   ),
                                   
                                   // Estado (activo/inactivo)
-                                  GestureDetector(
-                                    onTap: _toggleCustomerStatus,
-                                    child: Container(
-                                      padding: const EdgeInsets.symmetric(
-                                        horizontal: 12,
-                                        vertical: 6,
-                                      ),
-                                      decoration: BoxDecoration(
-                                        color: _customer!.isActive 
-                                            ? const Color(0xFFE6F7ED)
-                                            : const Color(0xFFFFE9EC),
-                                        borderRadius: BorderRadius.circular(12),
-                                      ),
-                                      child: Text(
-                                        _customer!.isActive ? 'Activo' : 'Inactivo',
-                                        style: TextStyle(
-                                          fontSize: 14,
-                                          fontWeight: FontWeight.w500,
-                                          color: _customer!.isActive
-                                              ? const Color(0xFF0D9145)
-                                              : const Color(0xFFD93644),
-                                        ),
-                                      ),
-                                    ),
-                                  ),
+                                  // GestureDetector(
+                                  //   onTap: _toggleCustomerStatus,
+                                  //   child: Container(
+                                  //     padding: const EdgeInsets.symmetric(
+                                  //       horizontal: 12,
+                                  //       vertical: 6,
+                                  //     ),
+                                  //     decoration: BoxDecoration(
+                                  //       color: _customer!.isActive 
+                                  //           ? const Color(0xFFE6F7ED)
+                                  //           : const Color(0xFFFFE9EC),
+                                  //       borderRadius: BorderRadius.circular(12),
+                                  //     ),
+                                  //     child: Text(
+                                  //       _customer!.isActive ? 'Activo' : 'Inactivo',
+                                  //       style: TextStyle(
+                                  //         fontSize: 14,
+                                  //         fontWeight: FontWeight.w500,
+                                  //         color: _customer!.isActive
+                                  //             ? const Color(0xFF0D9145)
+                                  //             : const Color(0xFFD93644),
+                                  //       ),
+                                  //     ),
+                                  //   ),
+                                  // ),
                                 ],
                               ),
                               const SizedBox(height: 16),
@@ -305,7 +357,38 @@ class _CustomerDetailScreenState extends State<CustomerDetailScreen> {
                                   ),
                                 ],
                               ),
-                              const SizedBox(height: 12),
+                              
+                              // Teléfono con opciones de copiar
+                              Padding(
+                                padding: const EdgeInsets.symmetric(vertical: 8.0),
+                                child: Row(
+                                  children: [
+                                    const Icon(
+                                      Icons.phone_outlined,
+                                      size: 18,
+                                      color: Colors.grey,
+                                    ),
+                                    const SizedBox(width: 8),
+                                    Text(
+                                      _customer!.phone,
+                                      style: const TextStyle(
+                                        fontSize: 16,
+                                      ),
+                                    ),
+                                    const Spacer(),
+                                    // Botón para copiar teléfono
+                                    IconButton(
+                                      icon: const Icon(Icons.copy, size: 18),
+                                      onPressed: _copyPhoneNumber,
+                                      tooltip: 'Copiar teléfono',
+                                      padding: EdgeInsets.zero,
+                                      constraints: const BoxConstraints(),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              
+                              const SizedBox(height: 16),
                               
                               // Botones de acción
                               Row(
@@ -322,16 +405,27 @@ class _CustomerDetailScreenState extends State<CustomerDetailScreen> {
                                     ),
                                   ),
                                   
-                                  // Botón para enviar correo
+                                  // Botón para WhatsApp
                                   ElevatedButton.icon(
-                                    onPressed: _sendEmail,
-                                    icon: const Icon(Icons.email),
-                                    label: const Text('Email'),
+                                    onPressed: _sendWhatsAppMessage,
+                                    icon: const Icon(Icons.chat_outlined),
+                                    label: const Text('WhatsApp'),
                                     style: ElevatedButton.styleFrom(
-                                      backgroundColor: AppTheme.primaryColor,
+                                      backgroundColor: const Color(0xFF25D366), // Color verde de WhatsApp
                                       foregroundColor: Colors.white,
                                     ),
                                   ),
+                                  
+                                  // Botón para enviar correo
+                                  // ElevatedButton.icon(
+                                  //   onPressed: _sendEmail,
+                                  //   icon: const Icon(Icons.email),
+                                  //   label: const Text('Email'),
+                                  //   style: ElevatedButton.styleFrom(
+                                  //     backgroundColor: Colors.orange,
+                                  //     foregroundColor: Colors.white,
+                                  //   ),
+                                  // ),
                                 ],
                               ),
                             ],
@@ -369,6 +463,17 @@ class _CustomerDetailScreenState extends State<CustomerDetailScreen> {
                                 title: const Text('Teléfono'),
                                 subtitle: Text(_customer!.phone),
                                 contentPadding: EdgeInsets.zero,
+                                trailing: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    // Botón para copiar
+                                    IconButton(
+                                      icon: const Icon(Icons.copy, size: 20),
+                                      onPressed: _copyPhoneNumber,
+                                      tooltip: 'Copiar',
+                                    ),
+                                  ],
+                                ),
                               ),
                               const Divider(),
                               

@@ -13,7 +13,7 @@ import 'package:ehstore_app/models/product.dart';
 import 'package:ehstore_app/services/product_service.dart';
 
 class HomeScreen extends StatefulWidget {
-  const HomeScreen({super.key});
+  const HomeScreen({super.key});  
 
   @override
   State<HomeScreen> createState() => _HomeScreenState();
@@ -61,10 +61,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   icon: const Icon(Icons.refresh),
                   onPressed: _loadLowStockProducts,
                 ),
-                IconButton(
-                  icon: const Icon(Icons.settings_outlined),
-                  onPressed: () {},
-                ),
+                const SizedBox(width: 10),
               ],
             )
           : null,

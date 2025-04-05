@@ -230,11 +230,13 @@ class _CustomerFormScreenState extends State<CustomerFormScreen> {
                     const SizedBox(height: 16),
                     
                     // Tipo de documento
-                    DropdownButtonFormField<String>(
+                    DropdownButtonFormField<String>(                    
                       value: _selectedDocumentType,
                       decoration: const InputDecoration(
                         labelText: 'Tipo de documento',
                         border: OutlineInputBorder(),
+                        fillColor: Colors.white,
+                        filled: true,
                         prefixIcon: Icon(Icons.badge_outlined),
                       ),
                       items: _documentTypes

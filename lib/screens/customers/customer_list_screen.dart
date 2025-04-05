@@ -117,7 +117,7 @@ class _CustomerListScreenState extends State<CustomerListScreen> {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
-            child: const Text('Cancelar'),
+            child: const Text('Cancelar', style: TextStyle(color: AppTheme.primaryColor),),
           ),
           TextButton(
             onPressed: () => Navigator.pop(context, true),
@@ -227,15 +227,7 @@ class _CustomerListScreenState extends State<CustomerListScreen> {
             icon: const Icon(Icons.refresh),
             tooltip: 'Recargar lista',
           ),
-          // Botón para mostrar/ocultar inactivos
-          IconButton(
-            onPressed: _toggleShowInactive,
-            icon: Icon(
-              _showInactive ? Icons.visibility_off : Icons.visibility,
-              color: _showInactive ? AppTheme.primaryColor : Colors.grey,
-            ),
-            tooltip: _showInactive ? 'Ocultar inactivos' : 'Mostrar inactivos',
-          ),
+          const SizedBox(width: 5)
         ],
       ),
       body: Column(
@@ -296,7 +288,7 @@ class _CustomerListScreenState extends State<CustomerListScreen> {
                             const SizedBox(height: 16),
                             ElevatedButton.icon(
                               onPressed: () => _navigateToCustomerForm(),
-                              icon: const Icon(Icons.add),
+                              icon: const Icon(Icons.add, color: Colors.white,),
                               label: const Text('Agregar cliente'),
                               style: ElevatedButton.styleFrom(
                                 backgroundColor: AppTheme.primaryColor,
@@ -324,7 +316,7 @@ class _CustomerListScreenState extends State<CustomerListScreen> {
                                 customer: customer,
                                 onTap: () => _navigateToCustomerDetail(customer),
                                 onToggleStatus: () => _toggleCustomerStatus(customer),
-                                onDelete: () => _confirmDelete(customer),
+                                //onDelete: () => _confirmDelete(customer),
                               ),
                             );
                           },
@@ -336,7 +328,7 @@ class _CustomerListScreenState extends State<CustomerListScreen> {
       floatingActionButton: FloatingActionButton(
         onPressed: () => _navigateToCustomerForm(),
         backgroundColor: AppTheme.primaryColor,
-        child: const Icon(Icons.add),
+        child: const Icon(Icons.add, color: Colors.white,),
       ),
     );
   }
