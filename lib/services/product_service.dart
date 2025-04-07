@@ -164,6 +164,16 @@ class ProductService {
     return await _dbService.getProductById(id);
   }
 
+  // Actualizar stock directamente
+  Future<bool> updateProductStock(String id, int newStock) async {
+    if (newStock < 0) {
+      throw Exception('El stock no puede ser negativo');
+    }
+    
+    final result = await _dbService.updateProductStock(id, newStock);
+    return result > 0;
+  }
+
   // Agregar datos de prueba
   Future<void> addMockData() async {
     if (_mockDataAdded) return;

@@ -7,6 +7,9 @@ import 'package:ehstore_app/screens/customers/customer_list_screen.dart';
 import 'package:ehstore_app/screens/customers/customer_detail_screen.dart';
 import 'package:ehstore_app/screens/customers/customer_form_screen.dart';
 import 'screens/inventory/products_screen.dart';
+import 'package:ehstore_app/screens/sales/sales_screen.dart';
+import 'package:ehstore_app/screens/sales/new_sale_screen.dart';
+import 'package:ehstore_app/screens/sales/sale_detail_screen.dart';
 
 void main() {
   runApp(const MyApp());
@@ -28,6 +31,11 @@ class MyApp extends StatelessWidget {
         '/customer_form': (context) => CustomerFormScreen(
               customer: ModalRoute.of(context)?.settings.arguments as dynamic,
             ),
+        '/sales': (context) => const SalesScreen(),
+        '/sales/new': (context) => const NewSaleScreen(),
+        '/sales/detail': (context) => SaleDetailScreen(
+          saleId: ModalRoute.of(context)!.settings.arguments as String,
+        ),
       },
       onGenerateRoute: (settings) {
         if (settings.name == '/customer_detail') {
