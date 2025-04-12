@@ -13,6 +13,9 @@ class Product {
   final Map<String, dynamic> specifications;
   final DateTime createdAt;
   final DateTime updatedAt;
+  
+  // Tasa de cambio (precio de 1 dólar en bolivares)
+  static double exchangeRate = 60.0;
 
   Product({
     required this.id,
@@ -30,6 +33,9 @@ class Product {
   });
 
   bool get isLowStock => currentStock <= minimumStock;
+  
+  // Método para obtener el precio en bolivares
+  double get priceInBs => price * exchangeRate;
 
   factory Product.fromJson(Map<String, dynamic> json) {
     return Product(

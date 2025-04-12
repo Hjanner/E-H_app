@@ -69,13 +69,25 @@ class ProductCard extends StatelessWidget {
               
               // Precio (opcional)
               if (showPrice) ...[
-                Text(
-                  '\$${product.price.toStringAsFixed(2)}',
-                  style: TextStyle(
-                    fontSize: 15,
-                    color: AppTheme.primaryColor,
-                    fontWeight: FontWeight.w600,
-                  ),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      '\$${product.price.toStringAsFixed(2)}',
+                      style: TextStyle(
+                        fontSize: 15,
+                        color: AppTheme.primaryColor,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    Text(
+                      'Bs ${product.priceInBs.toStringAsFixed(2)}',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: Colors.grey[700],
+                      ),
+                    ),
+                  ],
                 ),
                 const SizedBox(height: 6),
               ],

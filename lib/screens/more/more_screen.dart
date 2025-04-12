@@ -5,10 +5,17 @@ import 'package:ehstore_app/screens/more/supplier/supplier_list_screen.dart';
 import 'package:ehstore_app/screens/more/customers/customers_screen.dart';
 import 'package:ehstore_app/screens/reports/reports_screen.dart';
 import 'package:ehstore_app/screens/settings/settings_screen.dart';
+import 'package:ehstore_app/screens/more/exchange_rate/exchange_rate_screen.dart';
+import 'package:ehstore_app/models/product.dart';
 
-class MoreScreen extends StatelessWidget {
+class MoreScreen extends StatefulWidget {
   const MoreScreen({super.key});
 
+  @override
+  State<MoreScreen> createState() => _MoreScreenState();
+}
+
+class _MoreScreenState extends State<MoreScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -60,9 +67,27 @@ class MoreScreen extends StatelessWidget {
             ),
             _buildMenuOption(
               context,
+              title: 'Tasa de Cambio',
+              subtitle: '${Product.exchangeRate.toStringAsFixed(2)} Bs/\$',
+              icon: Icons.currency_exchange,
+              color: Colors.purple.shade700,
+              onTap: () async {
+                final result = await Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => const ExchangeRateScreen(),
+                  ),
+                );
+                if (result == true) {
+                  setState(() {}); // Actualizar para mostrar la nueva tasa
+                }
+              },
+            ),
+            _buildMenuOption(
+              context,
               title: 'Reportes',
               icon: Icons.bar_chart,
-              color: Colors.purple.shade700,
+              color: Colors.indigo.shade700,
               onTap: () => Navigator.push(
                 context,
                 MaterialPageRoute(
@@ -91,6 +116,7 @@ class MoreScreen extends StatelessWidget {
   Widget _buildMenuOption(
     BuildContext context, {
     required String title,
+    String? subtitle,
     required IconData icon,
     required Color color,
     required VoidCallback onTap,
@@ -129,7 +155,19 @@ class MoreScreen extends StatelessWidget {
                 fontWeight: FontWeight.bold,
                 fontSize: 16,
               ),
+              textAlign: TextAlign.center,
             ),
+            if (subtitle != null) ...[
+              const SizedBox(height: 4),
+              Text(
+                subtitle,
+                style: TextStyle(
+                  fontSize: 12,
+                  color: Colors.grey[600],
+                ),
+                textAlign: TextAlign.center,
+              ),
+            ],
           ],
         ),
       ),

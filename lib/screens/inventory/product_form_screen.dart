@@ -349,26 +349,49 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
                     const SizedBox(height: 16),
 
                     // Precio
-                    TextFormField(
-                      controller: _priceController,
-                      decoration: const InputDecoration(
-                        labelText: 'Precio (Dolar)',
-                        border: OutlineInputBorder(),
-                        prefixIcon: Icon(Icons.attach_money),
-                      ),
-                      keyboardType: TextInputType.number,
-                      validator: (value) {
-                        if (value == null || value.isEmpty) {
-                          return 'Por favor ingrese un precio';
-                        }
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        TextFormField(
+                          controller: _priceController,
+                          decoration: const InputDecoration(
+                            labelText: 'Precio (Dolar)',
+                            border: OutlineInputBorder(),
+                            prefixIcon: Icon(Icons.attach_money),
+                          ),
+                          keyboardType: TextInputType.number,
+                          validator: (value) {
+                            if (value == null || value.isEmpty) {
+                              return 'Por favor ingrese un precio';
+                            }
+                            
+                            final price = double.tryParse(value);
+                            if (price == null || price <= 0) {
+                              return 'Ingrese un precio válido mayor a 0';
+                            }
+                            
+                            return null;
+                          },
+                          onChanged: (value) {
+                            // Forzar actualización de la UI para mostrar el precio en Bs actualizado
+                            setState(() {});
+                          },
+                        ),
                         
-                        final price = double.tryParse(value);
-                        if (price == null || price <= 0) {
-                          return 'Ingrese un precio válido mayor a 0';
-                        }
-                        
-                        return null;
-                      },
+                        // Mostrar el precio convertido a bolivares
+                        if (_priceController.text.isNotEmpty && double.tryParse(_priceController.text) != null)
+                          Padding(
+                            padding: const EdgeInsets.only(top: 8.0, left: 8.0),
+                            child: Text(
+                              'Equivalente: Bs ${(double.parse(_priceController.text) * Product.exchangeRate).toStringAsFixed(2)}',
+                              style: TextStyle(
+                                color: Colors.grey[700],
+                                fontStyle: FontStyle.italic,
+                                fontSize: 14,
+                              ),
+                            ),
+                          ),
+                      ],
                     ),
                     const SizedBox(height: 16),
 
