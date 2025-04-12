@@ -31,7 +31,7 @@ class DatabaseService {
     String path = join(documentsDirectory.path, 'ehstore.db');
     return await openDatabase(
       path,
-      version: 6, // Incrementamos la versión para la nueva migración
+      version: 8, // Incrementamos la versión para la nueva migración
       onCreate: _onCreate,
       onUpgrade: _onUpgrade,
     );
@@ -140,22 +140,23 @@ class DatabaseService {
 
     // Tabla para las ventas
     await db.execute('''
-      CREATE TABLE sales(
+      CREATE TABLE IF NOT EXISTS sales (
         id TEXT PRIMARY KEY,
         customer_id TEXT NOT NULL,
         customer_name TEXT,
         date TEXT NOT NULL,
         subtotal REAL NOT NULL,
-        tax REAL NOT NULL,
         discount REAL NOT NULL,
         total REAL NOT NULL,
-        payment_method TEXT NOT NULL,
+        total_in_usd REAL NOT NULL,
+        exchange_rate REAL NOT NULL,
         status TEXT NOT NULL,
         reference TEXT,
         notes TEXT,
         created_at TEXT NOT NULL,
         updated_at TEXT NOT NULL,
-        FOREIGN KEY (customer_id) REFERENCES customers (id) ON DELETE RESTRICT
+        paid_amount REAL NOT NULL,
+        pending_amount REAL NOT NULL
       )
     ''');
 
@@ -173,6 +174,24 @@ class DatabaseService {
         notes TEXT,
         FOREIGN KEY (sale_id) REFERENCES sales (id) ON DELETE CASCADE,
         FOREIGN KEY (product_id) REFERENCES products (id) ON DELETE RESTRICT
+      )
+    ''');
+    
+    // Tabla para los detalles de pago
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS payment_details (
+        id TEXT PRIMARY KEY,
+        sale_id TEXT NOT NULL,
+        method TEXT NOT NULL,
+        amount REAL NOT NULL,
+        currency TEXT NOT NULL DEFAULT 'bsf',
+        exchange_rate REAL NOT NULL DEFAULT 1.0,
+        amount_in_usd REAL NOT NULL DEFAULT 0.0,
+        reference TEXT,
+        date TEXT NOT NULL,
+        notes TEXT,
+        created_at TEXT NOT NULL,
+        FOREIGN KEY (sale_id) REFERENCES sales (id) ON DELETE CASCADE
       )
     ''');
   }
@@ -454,6 +473,179 @@ class DatabaseService {
           FOREIGN KEY (product_id) REFERENCES products (id) ON DELETE RESTRICT
         )
       ''');
+    }
+
+    // Migración para actualizar las ventas a la nueva estructura
+    if (oldVersion < 7) {
+      // Crear la tabla de detalles de pago
+      await db.execute('''
+        CREATE TABLE payment_details(
+          id TEXT PRIMARY KEY,
+          sale_id TEXT NOT NULL,
+          method TEXT NOT NULL,
+          amount REAL NOT NULL,
+          currency TEXT NOT NULL,
+          exchange_rate REAL NOT NULL,
+          amount_in_usd REAL NOT NULL,
+          reference TEXT,
+          date TEXT NOT NULL,
+          notes TEXT,
+          created_at TEXT NOT NULL,
+          FOREIGN KEY (sale_id) REFERENCES sales (id) ON DELETE CASCADE
+        )
+      ''');
+      
+      // Añadir nuevas columnas a la tabla de ventas
+      await db.execute('ALTER TABLE sales ADD COLUMN paid_amount REAL NOT NULL DEFAULT 0');
+      await db.execute('ALTER TABLE sales ADD COLUMN pending_amount REAL NOT NULL DEFAULT 0');
+      
+      // Obtener todas las ventas existentes
+      final List<Map<String, dynamic>> existingSales = await db.query('sales');
+      
+      // Actualizar cada venta existente
+      for (var sale in existingSales) {
+        final saleId = sale['id'];
+        final total = sale['total'] as double;
+        final method = sale['payment_method'] as String;
+        final reference = sale['reference'] as String?;
+        final date = sale['date'] as String;
+        final status = sale['status'] as String;
+        
+        // Crear un registro de pago para esta venta
+        final paymentId = Uuid().v4();
+        
+        // Si el estado es 'Completada', añadir un pago por el total
+        if (status == 'Completada') {
+          await db.insert(
+            'payment_details',
+            {
+              'id': paymentId,
+              'sale_id': saleId,
+              'method': method,
+              'amount': total,
+              'currency': 'bsf',
+              'exchange_rate': 1.0,
+              'amount_in_usd': total,
+              'reference': reference,
+              'date': date,
+              'notes': null,
+              'created_at': DateTime.now().toIso8601String(),
+            },
+          );
+          
+          // Actualizar la venta con el monto pagado
+          await db.update(
+            'sales',
+            {
+              'paid_amount': total,
+              'pending_amount': 0.0,
+            },
+            where: 'id = ?',
+            whereArgs: [saleId],
+          );
+        } else {
+          // Para otras ventas, establecer todo como pendiente
+          await db.update(
+            'sales',
+            {
+              'paid_amount': 0.0,
+              'pending_amount': total,
+            },
+            where: 'id = ?',
+            whereArgs: [saleId],
+          );
+        }
+      }
+      
+      // Eliminar las columnas obsoletas (en SQLite no se pueden eliminar columnas directamente)
+      // Hay que crear una tabla temporal, copiar los datos, y luego renombrarla
+      
+      // Agregar las columnas faltantes para compatibilidad con el modelo Sale
+      try {
+        await db.execute('ALTER TABLE sales ADD COLUMN total_in_usd REAL NOT NULL DEFAULT 0.0');
+        await db.execute('ALTER TABLE sales ADD COLUMN exchange_rate REAL NOT NULL DEFAULT 1.0');
+      } catch (e) {
+        print('Error al agregar columnas: $e');
+        // Las columnas pueden ya existir, continuar con la migración
+      }
+      
+      // Primero crear una tabla temporal con la nueva estructura
+      await db.execute('''
+        CREATE TABLE sales_temp(
+          id TEXT PRIMARY KEY,
+          customer_id TEXT NOT NULL,
+          customer_name TEXT,
+          date TEXT NOT NULL,
+          subtotal REAL NOT NULL,
+          discount REAL NOT NULL,
+          total REAL NOT NULL,
+          total_in_usd REAL NOT NULL,
+          exchange_rate REAL NOT NULL,
+          status TEXT NOT NULL,
+          notes TEXT,
+          created_at TEXT NOT NULL,
+          updated_at TEXT NOT NULL,
+          paid_amount REAL NOT NULL,
+          pending_amount REAL NOT NULL,
+          FOREIGN KEY (customer_id) REFERENCES customers (id) ON DELETE RESTRICT
+        )
+      ''');
+      
+      // Copiar los datos
+      await db.execute('''
+        INSERT INTO sales_temp 
+        SELECT 
+          id, 
+          customer_id, 
+          customer_name, 
+          date, 
+          subtotal, 
+          discount, 
+          total, 
+          COALESCE(total_in_usd, total) as total_in_usd,
+          COALESCE(exchange_rate, 1.0) as exchange_rate,
+          status, 
+          notes, 
+          created_at, 
+          updated_at,
+          paid_amount,
+          pending_amount
+        FROM sales
+      ''');
+      
+      // Eliminar la tabla original
+      await db.execute('DROP TABLE sales');
+      
+      // Renombrar la tabla temporal
+      await db.execute('ALTER TABLE sales_temp RENAME TO sales');
+    }
+    
+    if (oldVersion < 8) {
+      // Verificar y añadir columnas que pueden faltar en sales
+      try {
+        final tableInfo = await db.rawQuery("PRAGMA table_info(sales)");
+        
+        final hasTotalInUsdColumn = tableInfo.any((column) => column['name'] == 'total_in_usd');
+        final hasExchangeRateColumn = tableInfo.any((column) => column['name'] == 'exchange_rate');
+        
+        if (!hasTotalInUsdColumn) {
+          await db.execute('ALTER TABLE sales ADD COLUMN total_in_usd REAL NOT NULL DEFAULT 0.0');
+        }
+        
+        if (!hasExchangeRateColumn) {
+          await db.execute('ALTER TABLE sales ADD COLUMN exchange_rate REAL NOT NULL DEFAULT 1.0');
+        }
+        
+        // Actualizar registros existentes para que tengan valores válidos
+        await db.execute('''
+          UPDATE sales 
+          SET total_in_usd = total, exchange_rate = 1.0 
+          WHERE total_in_usd IS NULL OR total_in_usd = 0
+        ''');
+        
+      } catch (e) {
+        print('Error al verificar/añadir columnas: $e');
+      }
     }
   }
 
@@ -1607,6 +1799,25 @@ class DatabaseService {
         notes: itemMap['notes'],
       )).toList();
 
+      // Obtener los pagos para esta venta
+      final List<Map<String, dynamic>> paymentMaps = await db.query(
+        'payment_details',
+        where: 'sale_id = ?',
+        whereArgs: [saleMap['id']],
+      );
+      
+      List<PaymentDetail> payments = paymentMaps.map((paymentMap) => PaymentDetail(
+        id: paymentMap['id'],
+        method: Sale.stringToPaymentMethod(paymentMap['method']),
+        amount: paymentMap['amount'],
+        currency: Sale.stringToPaymentCurrency(paymentMap['currency'] ?? 'bsf'),
+        exchangeRate: paymentMap['exchange_rate'] ?? 1.0,
+        amountInUsd: paymentMap['amount_in_usd'] ?? paymentMap['amount'],
+        reference: paymentMap['reference'],
+        date: DateTime.parse(paymentMap['date']),
+        notes: paymentMap['notes'],
+      )).toList();
+
       // Crear el objeto Sale
       sales.add(Sale(
         id: saleMap['id'],
@@ -1615,15 +1826,17 @@ class DatabaseService {
         date: DateTime.parse(saleMap['date']),
         items: items,
         subtotal: saleMap['subtotal'],
-        tax: saleMap['tax'],
         discount: saleMap['discount'],
         total: saleMap['total'],
-        paymentMethod: Sale.stringToPaymentMethod(saleMap['payment_method']),
+        totalInUsd: saleMap['total_in_usd'] ?? saleMap['total'],
+        exchangeRate: saleMap['exchange_rate'] ?? 1.0,
+        payments: payments,
         status: Sale.stringToStatus(saleMap['status']),
-        reference: saleMap['reference'],
         notes: saleMap['notes'],
         createdAt: DateTime.parse(saleMap['created_at']),
         updatedAt: DateTime.parse(saleMap['updated_at']),
+        paidAmount: saleMap['paid_amount'],
+        pendingAmount: saleMap['pending_amount'],
       ));
     }
 
@@ -1664,6 +1877,25 @@ class DatabaseService {
         notes: itemMap['notes'],
       )).toList();
 
+      // Obtener los pagos para esta venta
+      final List<Map<String, dynamic>> paymentMaps = await db.query(
+        'payment_details',
+        where: 'sale_id = ?',
+        whereArgs: [saleMap['id']],
+      );
+      
+      List<PaymentDetail> payments = paymentMaps.map((paymentMap) => PaymentDetail(
+        id: paymentMap['id'],
+        method: Sale.stringToPaymentMethod(paymentMap['method']),
+        amount: paymentMap['amount'],
+        currency: Sale.stringToPaymentCurrency(paymentMap['currency'] ?? 'bsf'),
+        exchangeRate: paymentMap['exchange_rate'] ?? 1.0,
+        amountInUsd: paymentMap['amount_in_usd'] ?? paymentMap['amount'],
+        reference: paymentMap['reference'],
+        date: DateTime.parse(paymentMap['date']),
+        notes: paymentMap['notes'],
+      )).toList();
+
       // Crear el objeto Sale
       sales.add(Sale(
         id: saleMap['id'],
@@ -1672,15 +1904,17 @@ class DatabaseService {
         date: DateTime.parse(saleMap['date']),
         items: items,
         subtotal: saleMap['subtotal'],
-        tax: saleMap['tax'],
         discount: saleMap['discount'],
         total: saleMap['total'],
-        paymentMethod: Sale.stringToPaymentMethod(saleMap['payment_method']),
+        totalInUsd: saleMap['total_in_usd'] ?? saleMap['total'],
+        exchangeRate: saleMap['exchange_rate'] ?? 1.0,
+        payments: payments,
         status: Sale.stringToStatus(saleMap['status']),
-        reference: saleMap['reference'],
         notes: saleMap['notes'],
         createdAt: DateTime.parse(saleMap['created_at']),
         updatedAt: DateTime.parse(saleMap['updated_at']),
+        paidAmount: saleMap['paid_amount'],
+        pendingAmount: saleMap['pending_amount'],
       ));
     }
 
@@ -1721,6 +1955,25 @@ class DatabaseService {
         notes: itemMap['notes'],
       )).toList();
 
+      // Obtener los pagos para esta venta
+      final List<Map<String, dynamic>> paymentMaps = await db.query(
+        'payment_details',
+        where: 'sale_id = ?',
+        whereArgs: [saleMap['id']],
+      );
+      
+      List<PaymentDetail> payments = paymentMaps.map((paymentMap) => PaymentDetail(
+        id: paymentMap['id'],
+        method: Sale.stringToPaymentMethod(paymentMap['method']),
+        amount: paymentMap['amount'],
+        currency: Sale.stringToPaymentCurrency(paymentMap['currency'] ?? 'bsf'),
+        exchangeRate: paymentMap['exchange_rate'] ?? 1.0,
+        amountInUsd: paymentMap['amount_in_usd'] ?? paymentMap['amount'],
+        reference: paymentMap['reference'],
+        date: DateTime.parse(paymentMap['date']),
+        notes: paymentMap['notes'],
+      )).toList();
+
       // Crear el objeto Sale
       sales.add(Sale(
         id: saleMap['id'],
@@ -1729,15 +1982,17 @@ class DatabaseService {
         date: DateTime.parse(saleMap['date']),
         items: items,
         subtotal: saleMap['subtotal'],
-        tax: saleMap['tax'],
         discount: saleMap['discount'],
         total: saleMap['total'],
-        paymentMethod: Sale.stringToPaymentMethod(saleMap['payment_method']),
+        totalInUsd: saleMap['total_in_usd'] ?? saleMap['total'],
+        exchangeRate: saleMap['exchange_rate'] ?? 1.0,
+        payments: payments,
         status: Sale.stringToStatus(saleMap['status']),
-        reference: saleMap['reference'],
         notes: saleMap['notes'],
         createdAt: DateTime.parse(saleMap['created_at']),
         updatedAt: DateTime.parse(saleMap['updated_at']),
+        paidAmount: saleMap['paid_amount'],
+        pendingAmount: saleMap['pending_amount'],
       ));
     }
 
@@ -1775,6 +2030,25 @@ class DatabaseService {
       notes: itemMap['notes'],
     )).toList();
 
+    // Obtener los pagos para esta venta
+    final List<Map<String, dynamic>> paymentMaps = await db.query(
+      'payment_details',
+      where: 'sale_id = ?',
+      whereArgs: [id],
+    );
+    
+    List<PaymentDetail> payments = paymentMaps.map((paymentMap) => PaymentDetail(
+      id: paymentMap['id'],
+      method: Sale.stringToPaymentMethod(paymentMap['method']),
+      amount: paymentMap['amount'],
+      currency: Sale.stringToPaymentCurrency(paymentMap['currency'] ?? 'bsf'),
+      exchangeRate: paymentMap['exchange_rate'] ?? 1.0,
+      amountInUsd: paymentMap['amount_in_usd'] ?? paymentMap['amount'],
+      reference: paymentMap['reference'],
+      date: DateTime.parse(paymentMap['date']),
+      notes: paymentMap['notes'],
+    )).toList();
+
     // Crear el objeto Sale
     return Sale(
       id: saleMaps.first['id'],
@@ -1783,15 +2057,17 @@ class DatabaseService {
       date: DateTime.parse(saleMaps.first['date']),
       items: items,
       subtotal: saleMaps.first['subtotal'],
-      tax: saleMaps.first['tax'],
       discount: saleMaps.first['discount'],
       total: saleMaps.first['total'],
-      paymentMethod: Sale.stringToPaymentMethod(saleMaps.first['payment_method']),
+      totalInUsd: saleMaps.first['total_in_usd'] ?? saleMaps.first['total'],
+      exchangeRate: saleMaps.first['exchange_rate'] ?? 1.0,
+      payments: payments,
       status: Sale.stringToStatus(saleMaps.first['status']),
-      reference: saleMaps.first['reference'],
       notes: saleMaps.first['notes'],
       createdAt: DateTime.parse(saleMaps.first['created_at']),
       updatedAt: DateTime.parse(saleMaps.first['updated_at']),
+      paidAmount: saleMaps.first['paid_amount'],
+      pendingAmount: saleMaps.first['pending_amount'],
     );
   }
 
@@ -1809,15 +2085,16 @@ class DatabaseService {
           'customer_name': sale.customerName,
           'date': sale.date.toIso8601String(),
           'subtotal': sale.subtotal,
-          'tax': sale.tax,
           'discount': sale.discount,
           'total': sale.total,
-          'payment_method': Sale.paymentMethodToString(sale.paymentMethod),
+          'total_in_usd': sale.totalInUsd,
+          'exchange_rate': sale.exchangeRate,
           'status': Sale.statusToString(sale.status),
-          'reference': sale.reference,
           'notes': sale.notes,
           'created_at': sale.createdAt.toIso8601String(),
           'updated_at': sale.updatedAt.toIso8601String(),
+          'paid_amount': sale.paidAmount,
+          'pending_amount': sale.pendingAmount,
         },
         conflictAlgorithm: ConflictAlgorithm.replace,
       );
@@ -1859,6 +2136,27 @@ class DatabaseService {
             whereArgs: [item.productId],
           );
         }
+      }
+
+      // Insertar los pagos
+      for (var payment in sale.payments) {
+        await txn.insert(
+          'payment_details',
+          {
+            'id': payment.id,
+            'sale_id': sale.id,
+            'method': Sale.paymentMethodToString(payment.method),
+            'amount': payment.amount,
+            'currency': Sale.paymentCurrencyToString(payment.currency),
+            'exchange_rate': payment.exchangeRate,
+            'amount_in_usd': payment.amountInUsd,
+            'reference': payment.reference,
+            'date': payment.date.toIso8601String(),
+            'notes': payment.notes,
+            'created_at': DateTime.now().toIso8601String(), // Añadir campo created_at
+          },
+          conflictAlgorithm: ConflictAlgorithm.replace,
+        );
       }
 
       return 1; // Éxito
@@ -1993,5 +2291,227 @@ class DatabaseService {
       'saleCount': saleCount,
       'topProducts': topProducts,
     };
+  }
+
+  // Nuevo método para obtener ventas a crédito
+  Future<List<Sale>> getCreditSales() async {
+    final db = await database;
+    final List<Map<String, dynamic>> saleMaps = await db.query(
+      'sales',
+      where: 'status = ? OR pending_amount > 0',
+      whereArgs: [Sale.statusToString(SaleStatus.credit)],
+      orderBy: 'date DESC',
+    );
+    
+    if (saleMaps.isEmpty) {
+      return [];
+    }
+
+    List<Sale> sales = [];
+    for (var saleMap in saleMaps) {
+      // Obtener los items para esta venta
+      final List<Map<String, dynamic>> itemMaps = await db.query(
+        'sale_items',
+        where: 'sale_id = ?',
+        whereArgs: [saleMap['id']],
+      );
+      
+      List<SaleItem> items = itemMaps.map((itemMap) => SaleItem(
+        id: itemMap['id'],
+        saleId: itemMap['sale_id'],
+        productId: itemMap['product_id'],
+        productName: itemMap['product_name'],
+        price: itemMap['price'],
+        quantity: itemMap['quantity'],
+        subtotal: itemMap['subtotal'],
+        discount: itemMap['discount'],
+        notes: itemMap['notes'],
+      )).toList();
+
+      // Obtener los pagos para esta venta
+      final List<Map<String, dynamic>> paymentMaps = await db.query(
+        'payment_details',
+        where: 'sale_id = ?',
+        whereArgs: [saleMap['id']],
+      );
+      
+      List<PaymentDetail> payments = paymentMaps.map((paymentMap) => PaymentDetail(
+        id: paymentMap['id'],
+        method: Sale.stringToPaymentMethod(paymentMap['method']),
+        amount: paymentMap['amount'],
+        currency: Sale.stringToPaymentCurrency(paymentMap['currency'] ?? 'bsf'),
+        exchangeRate: paymentMap['exchange_rate'] ?? 1.0,
+        amountInUsd: paymentMap['amount_in_usd'] ?? paymentMap['amount'],
+        reference: paymentMap['reference'],
+        date: DateTime.parse(paymentMap['date']),
+        notes: paymentMap['notes'],
+      )).toList();
+
+      // Crear el objeto Sale
+      sales.add(Sale(
+        id: saleMap['id'],
+        customerId: saleMap['customer_id'],
+        customerName: saleMap['customer_name'],
+        date: DateTime.parse(saleMap['date']),
+        items: items,
+        subtotal: saleMap['subtotal'],
+        discount: saleMap['discount'],
+        total: saleMap['total'],
+        totalInUsd: saleMap['total_in_usd'] ?? saleMap['total'],
+        exchangeRate: saleMap['exchange_rate'] ?? 1.0,
+        payments: payments,
+        status: Sale.stringToStatus(saleMap['status']),
+        notes: saleMap['notes'],
+        createdAt: DateTime.parse(saleMap['created_at']),
+        updatedAt: DateTime.parse(saleMap['updated_at']),
+        paidAmount: saleMap['paid_amount'],
+        pendingAmount: saleMap['pending_amount'],
+      ));
+    }
+
+    return sales;
+  }
+
+  // Actualizar los montos pagados y pendientes de una venta
+  Future<int> updateSalePayments(String saleId, double paidAmount, double pendingAmount) async {
+    final db = await database;
+    return await db.update(
+      'sales',
+      {
+        'paid_amount': paidAmount,
+        'pending_amount': pendingAmount,
+        'updated_at': DateTime.now().toIso8601String(),
+      },
+      where: 'id = ?',
+      whereArgs: [saleId],
+    );
+  }
+
+  // Añadir un nuevo pago a una venta existente
+  Future<int> addPaymentToSale(String saleId, PaymentDetail payment) async {
+    final db = await database;
+    
+    return await db.transaction((txn) async {
+      // Insertar el detalle de pago
+      final paymentId = await txn.insert(
+        'payment_details',
+        {
+          'id': payment.id,
+          'sale_id': saleId,
+          'method': Sale.paymentMethodToString(payment.method),
+          'amount': payment.amount,
+          'currency': Sale.paymentCurrencyToString(payment.currency),
+          'exchange_rate': payment.exchangeRate,
+          'amount_in_usd': payment.amountInUsd,
+          'reference': payment.reference,
+          'date': payment.date.toIso8601String(),
+          'notes': payment.notes,
+          'created_at': DateTime.now().toIso8601String(),
+        },
+        conflictAlgorithm: ConflictAlgorithm.replace,
+      );
+      
+      // Obtener la venta
+      final saleMap = await txn.query(
+        'sales',
+        where: 'id = ?',
+        whereArgs: [saleId],
+      );
+      
+      if (saleMap.isNotEmpty) {
+        final currentPaidAmount = saleMap.first['paid_amount'] as double;
+        final currentPendingAmount = saleMap.first['pending_amount'] as double;
+        final total = saleMap.first['total'] as double;
+        
+        // Calcular los nuevos montos
+        final newPaidAmount = currentPaidAmount + payment.amount;
+        final newPendingAmount = total - newPaidAmount;
+        
+        // Determinar si la venta debe cambiar de estado
+        String status = saleMap.first['status'] as String;
+        if (newPendingAmount <= 0 && status == Sale.statusToString(SaleStatus.credit)) {
+          status = Sale.statusToString(SaleStatus.completed);
+        }
+        
+        // Actualizar la venta
+        await txn.update(
+          'sales',
+          {
+            'paid_amount': newPaidAmount,
+            'pending_amount': newPendingAmount,
+            'status': status,
+            'updated_at': DateTime.now().toIso8601String(),
+          },
+          where: 'id = ?',
+          whereArgs: [saleId],
+        );
+      }
+      
+      return paymentId;
+    });
+  }
+
+  Future<void> addMonthlySales(String month, String year, double amount, String method, String reference, String date) async {
+    final db = await database;
+    
+    final saleId = Uuid().v4();
+    final itemId = Uuid().v4();
+    final paymentId = Uuid().v4();
+    
+    // Insertar venta
+    await db.insert(
+      'sales',
+      {
+        'id': saleId,
+        'customer_id': 'system',
+        'customer_name': 'Sistema',
+        'date': date,
+        'subtotal': amount,
+        'discount': 0.0,
+        'total': amount,
+        'total_in_usd': amount,
+        'exchange_rate': 1.0,
+        'status': 'Completada',
+        'notes': 'Venta mensual para $month/$year',
+        'created_at': date,
+        'updated_at': date,
+        'paid_amount': amount,
+        'pending_amount': 0.0,
+      },
+    );
+    
+    // Insertar ítem
+    await db.insert(
+      'sale_items',
+      {
+        'id': itemId,
+        'sale_id': saleId,
+        'product_id': 'monthly_sales',
+        'product_name': 'Ventas Mensuales',
+        'price': amount,
+        'quantity': 1,
+        'subtotal': amount,
+        'discount': 0.0,
+        'notes': 'Ventas acumuladas para $month/$year',
+      },
+    );
+    
+    // Insertar pago
+    await db.insert(
+      'payment_details',
+      {
+        'id': paymentId,
+        'sale_id': saleId,
+        'method': method,
+        'amount': amount,
+        'currency': 'bsf',
+        'exchange_rate': 1.0,
+        'amount_in_usd': amount,
+        'reference': reference,
+        'date': date,
+        'notes': 'Venta mensual para $month/$year',
+        'created_at': date,
+      },
+    );
   }
 } 

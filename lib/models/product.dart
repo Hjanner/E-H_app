@@ -1,10 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class Product {
   final String id;
   final String name;
   final String description;
-  final double price;
+  final double price; // Precio en dólares (estático)
   final int currentStock;
   final int minimumStock;
   final String categoryId;
@@ -30,6 +31,24 @@ class Product {
   });
 
   bool get isLowStock => currentStock <= minimumStock;
+
+  // Método para obtener el precio en bolívares (dinámico)
+  Future<double> getPriceInBs() async {
+    final prefs = await SharedPreferences.getInstance();
+    final dolarRate = prefs.getDouble('dolar_rate') ?? 0.0;
+    
+    if (dolarRate <= 0) {
+      return 0.0; // Tasa no configurada
+    }
+    
+    return price * dolarRate;
+  }
+
+  // Método estático para obtener la tasa del dólar actual
+  static Future<double> getDolarRate() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getDouble('dolar_rate') ?? 0.0;
+  }
 
   factory Product.fromJson(Map<String, dynamic> json) {
     return Product(

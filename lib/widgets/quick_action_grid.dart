@@ -17,22 +17,30 @@ class QuickActionGrid extends StatelessWidget {
         _QuickActionCard(
           title: 'Añadir Venta',
           icon: Icons.add_shopping_cart,
-          onTap: () {},
+          onTap: () {
+            Navigator.pushNamed(context, '/sales/new');
+          },
         ),
         _QuickActionCard(
-          title: 'Deudas',
+          title: 'Gestión de Deudas',
           icon: Icons.account_balance_wallet,
-          onTap: () {},
+          onTap: () {
+            Navigator.pushNamed(context, '/sales/debts');
+          },
         ),
         _QuickActionCard(
           title: 'Inventario',
           icon: Icons.inventory_2,
-          onTap: () {},
+          onTap: () {
+            Navigator.pushNamed(context, '/inventory');
+          },
         ),
         _QuickActionCard(
-          title: 'Ventas',
-          icon: Icons.shopping_cart,
-          onTap: () {},
+          title: 'Ventas a Crédito',
+          icon: Icons.payment_outlined,
+          onTap: () {
+            Navigator.pushNamed(context, '/sales/credit');
+          },
         ),
       ],
     );

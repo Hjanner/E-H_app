@@ -2,8 +2,9 @@ import 'package:flutter/material.dart';
 import 'dart:io';
 import 'package:ehstore_app/models/product.dart';
 import 'package:ehstore_app/theme/app_theme.dart';
+import 'package:intl/intl.dart';
 
-class ProductCard extends StatelessWidget {
+class ProductCard extends StatefulWidget {
   final Product product;
   final VoidCallback onTap;
   final bool showPrice;
@@ -16,6 +17,51 @@ class ProductCard extends StatelessWidget {
   });
 
   @override
+  State<ProductCard> createState() => _ProductCardState();
+}
+
+class _ProductCardState extends State<ProductCard> {
+  double _bsPrice = 0.0;
+  double _dolarRate = 0.0;
+  final _currencyFormatBs = NumberFormat.currency(
+    locale: 'es_VE',
+    symbol: 'Bs. ',
+    decimalDigits: 2,
+  );
+  final _currencyFormatUsd = NumberFormat.currency(
+    locale: 'en_US',
+    symbol: '\$',
+    decimalDigits: 2,
+  );
+
+  @override
+  void initState() {
+    super.initState();
+    _loadBsPrice();
+  }
+
+  Future<void> _loadBsPrice() async {
+    try {
+      final dolarRate = await Product.getDolarRate();
+      final bsPrice = widget.product.price * dolarRate;
+      
+      if (mounted) {
+        setState(() {
+          _bsPrice = bsPrice;
+          _dolarRate = dolarRate;
+        });
+      }
+    } catch (e) {
+      // Si hay error, no mostramos el precio en Bs
+      if (mounted) {
+        setState(() {
+          _bsPrice = 0.0;
+        });
+      }
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
     return Card(
       elevation: 0,
@@ -24,7 +70,7 @@ class ProductCard extends StatelessWidget {
         borderRadius: BorderRadius.circular(15),
       ),
       child: InkWell(
-        onTap: onTap,
+        onTap: widget.onTap,
         borderRadius: BorderRadius.circular(15),
         child: Container(
           padding: const EdgeInsets.all(8),
@@ -36,11 +82,11 @@ class ProductCard extends StatelessWidget {
               ClipRRect(
                 borderRadius: BorderRadius.circular(12),
                 child: Container(
-                  height: showPrice ? 100 : 80,
+                  height: widget.showPrice ? 100 : 80,
                   width: double.infinity,
                   color: Colors.grey[200],
-                  child: product.imageUrls.isNotEmpty
-                      ? _buildProductImage(product.imageUrls.first)
+                  child: widget.product.imageUrls.isNotEmpty
+                      ? _buildProductImage(widget.product.imageUrls.first)
                       : const Center(
                           child: Icon(
                             Icons.image_outlined,
@@ -54,11 +100,11 @@ class ProductCard extends StatelessWidget {
               
               // Nombre del producto
               SizedBox(
-                height: showPrice ? 40 : 40,
+                height: widget.showPrice ? 40 : 40,
                 child: Text(
-                  product.name,
+                  widget.product.name,
                   style: TextStyle(
-                    fontSize: showPrice ? 15 : 15,
+                    fontSize: widget.showPrice ? 15 : 15,
                     fontWeight: FontWeight.bold,
                     height: 1.2,
                   ),
@@ -68,15 +114,28 @@ class ProductCard extends StatelessWidget {
               ),
               
               // Precio (opcional)
-              if (showPrice) ...[
+              if (widget.showPrice) ...[
+                // Precio en USD
                 Text(
-                  '\$${product.price.toStringAsFixed(2)}',
+                  _currencyFormatUsd.format(widget.product.price),
                   style: TextStyle(
                     fontSize: 15,
                     color: AppTheme.primaryColor,
                     fontWeight: FontWeight.w600,
                   ),
                 ),
+                
+                // Precio en Bs
+                if (_dolarRate > 0) ...[
+                  Text(
+                    _currencyFormatBs.format(_bsPrice),
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: Colors.grey[600],
+                    ),
+                  ),
+                ],
+                
                 const SizedBox(height: 6),
               ],
               
@@ -86,14 +145,14 @@ class ProductCard extends StatelessWidget {
                   Icon(
                     Icons.inventory_2_outlined,
                     size: 14,
-                    color: product.isLowStock ? Colors.red : Colors.grey[600],
+                    color: widget.product.isLowStock ? Colors.red : Colors.grey[600],
                   ),
                   const SizedBox(width: 4),
                   Text(
-                    'Stock: ${product.currentStock}',
+                    'Stock: ${widget.product.currentStock}',
                     style: TextStyle(
                       fontSize: 12,
-                      color: product.isLowStock ? Colors.red : Colors.grey[600],
+                      color: widget.product.isLowStock ? Colors.red : Colors.grey[600],
                     ),
                   ),
                 ],

@@ -7,6 +7,7 @@ import 'dart:io';
 import 'package:ehstore_app/services/supplier_service.dart';
 import 'package:ehstore_app/models/supplier.dart';
 import '../more/supplier/supplier_detail_screen.dart';
+import 'package:intl/intl.dart';
 
 class ProductDetailScreen extends StatefulWidget {
   final String productId;
@@ -28,6 +29,18 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
   int _selectedImageIndex = 0;
   bool _isLoading = false;
   bool _isLoadingSupplier = false;
+  double _bsPrice = 0.0;
+  double _dolarRate = 0.0;
+  final _currencyFormatBs = NumberFormat.currency(
+    locale: 'es_VE',
+    symbol: 'Bs. ',
+    decimalDigits: 2,
+  );
+  final _currencyFormatUsd = NumberFormat.currency(
+    locale: 'en_US',
+    symbol: '\$',
+    decimalDigits: 2,
+  );
 
   @override
   void initState() {
@@ -40,6 +53,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
     _productFuture.then((product) {
       if (product != null) {
         _loadSupplier(product.supplierId);
+        _loadBsPrice(product);
       }
     });
   }
@@ -67,6 +81,27 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
             backgroundColor: Colors.red,
           ),
         );
+      }
+    }
+  }
+
+  Future<void> _loadBsPrice(Product product) async {
+    try {
+      final dolarRate = await Product.getDolarRate();
+      final bsPrice = product.price * dolarRate;
+      
+      if (mounted) {
+        setState(() {
+          _bsPrice = bsPrice;
+          _dolarRate = dolarRate;
+        });
+      }
+    } catch (e) {
+      // Si hay error, no mostramos el precio en Bs
+      if (mounted) {
+        setState(() {
+          _bsPrice = 0.0;
+        });
       }
     }
   }
@@ -292,13 +327,26 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                             ),
                           ),
                           const SizedBox(width: 8),
-                          Text(
-                            '\$${product.price.toStringAsFixed(2)}',
-                            style: TextStyle(
-                              fontSize: 24,
-                              fontWeight: FontWeight.w600,
-                              color: AppTheme.primaryColor,
-                            ),
+                          Column(
+                            crossAxisAlignment: CrossAxisAlignment.end,
+                            children: [
+                              Text(
+                                _currencyFormatUsd.format(product.price),
+                                style: TextStyle(
+                                  fontSize: 24,
+                                  fontWeight: FontWeight.w600,
+                                  color: AppTheme.primaryColor,
+                                ),
+                              ),
+                              if (_dolarRate > 0) 
+                                Text(
+                                  _currencyFormatBs.format(_bsPrice),
+                                  style: TextStyle(
+                                    fontSize: 16,
+                                    color: Colors.grey[600],
+                                  ),
+                                ),
+                            ],
                           ),
                         ],
                       ),

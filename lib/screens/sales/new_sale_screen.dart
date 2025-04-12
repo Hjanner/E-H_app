@@ -28,15 +28,20 @@ class _NewSaleScreenState extends State<NewSaleScreen> {
   bool _isLoading = false;
   bool _isSearchingCustomer = false;
   bool _isSearchingProducts = false;
+  bool _showAddPaymentForm = false;
   
   // Datos de la venta
   Customer? _selectedCustomer;
   List<SaleItem> _selectedItems = [];
-  PaymentMethod _paymentMethod = PaymentMethod.cash;
-  double _taxRate = 16.0; // IVA por defecto (16%)
+  SaleStatus _saleStatus = SaleStatus.completed;
+  List<PaymentDetail> _payments = [];
   double _discount = 0.0;
-  String? _reference;
   String? _notes;
+  
+  // Para cliente no registrado
+  bool _isUnregisteredCustomer = false;
+  final TextEditingController _unregisteredCustomerNameController = TextEditingController();
+  final TextEditingController _unregisteredCustomerPhoneController = TextEditingController();
   
   // Listas de datos
   List<Customer> _customers = [];
@@ -46,9 +51,13 @@ class _NewSaleScreenState extends State<NewSaleScreen> {
   // Controladores
   final TextEditingController _customerSearchController = TextEditingController();
   final TextEditingController _productSearchController = TextEditingController();
-  final TextEditingController _referenceController = TextEditingController();
   final TextEditingController _notesController = TextEditingController();
   final TextEditingController _discountController = TextEditingController();
+  
+  // Para pagos
+  final TextEditingController _paymentAmountController = TextEditingController();
+  final TextEditingController _paymentReferenceController = TextEditingController();
+  PaymentMethod _paymentMethod = PaymentMethod.cash;
   
   // Formato moneda
   final currencyFormat = NumberFormat.currency(
@@ -67,9 +76,12 @@ class _NewSaleScreenState extends State<NewSaleScreen> {
   void dispose() {
     _customerSearchController.dispose();
     _productSearchController.dispose();
-    _referenceController.dispose();
     _notesController.dispose();
     _discountController.dispose();
+    _unregisteredCustomerNameController.dispose();
+    _unregisteredCustomerPhoneController.dispose();
+    _paymentAmountController.dispose();
+    _paymentReferenceController.dispose();
     super.dispose();
   }
 
@@ -157,6 +169,7 @@ class _NewSaleScreenState extends State<NewSaleScreen> {
       _selectedCustomer = customer;
       _customerSearchController.text = customer.fullName;
       _isSearchingCustomer = false;
+      _isUnregisteredCustomer = false;
     });
   }
 
@@ -293,116 +306,267 @@ class _NewSaleScreenState extends State<NewSaleScreen> {
     return _selectedItems.fold(0, (sum, item) => sum + item.subtotal);
   }
 
-  double _calculateTax() {
-    return _calculateSubtotal() * (_taxRate / 100);
+  double _calculateTotal() {
+    return _calculateSubtotal() - _discount;
   }
 
-  double _calculateTotal() {
-    return _calculateSubtotal() + _calculateTax() - _discount;
+  double _calculateTotalPaid() {
+    return _payments.fold(0, (sum, payment) => sum + payment.amountInUsd);
+  }
+
+  double _calculatePendingAmount() {
+    final totalSale = _calculateTotal();
+    final totalPaid = _calculateTotalPaid();
+    
+    // Convertir el totalSale a USD usando el método asíncrono
+    double pendingAmount = totalSale - totalPaid;
+    return pendingAmount > 0 ? pendingAmount : 0;
+  }
+
+  void _addPayment() async {
+    if (_paymentAmountController.text.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Debe ingresar un monto'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
+    
+    final totalPaid = _calculateTotalPaid();
+    final totalSale = _calculateTotal();
+    
+    try {
+      final amount = double.parse(_paymentAmountController.text);
+      
+      if (amount <= 0) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('El monto debe ser mayor a cero'),
+            backgroundColor: Colors.red,
+          ),
+        );
+        return;
+      }
+      
+      // Verificar que el total de pagos no exceda el total de la venta
+      if (totalPaid + amount > totalSale) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('El total de pagos no puede exceder el total de la venta'),
+            backgroundColor: Colors.red,
+          ),
+        );
+        return;
+      }
+      
+      // Determinar la moneda basada en el método de pago
+      final isForeignCurrency = _paymentMethod == PaymentMethod.foreignCash;
+      final currency = isForeignCurrency ? PaymentCurrency.usd : PaymentCurrency.bsf;
+      
+      // Crear nuevo pago
+      final newPayment = await _saleService.createPaymentDetail(
+        saleId: '',  // Se asignará cuando se cree la venta
+        method: _paymentMethod,
+        amount: amount,
+        currency: currency,
+        reference: _paymentReferenceController.text.isEmpty ? null : _paymentReferenceController.text,
+      );
+      
+      setState(() {
+        _payments.add(newPayment);
+        _paymentAmountController.clear();
+        _paymentReferenceController.clear();
+        _paymentMethod = PaymentMethod.cash;
+        _showAddPaymentForm = false;
+        
+        // Si la suma de pagos es igual al total, la venta está completada
+        // Si es menor, está a crédito
+        if (totalPaid + amount >= totalSale) {
+          _saleStatus = SaleStatus.completed;
+        } else {
+          _saleStatus = SaleStatus.credit;
+        }
+      });
+      
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Error: $e'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
+  }
+
+  void _removePayment(int index) {
+    setState(() {
+      _payments.removeAt(index);
+      
+      // Recalcular el estado de la venta
+      if (_payments.isEmpty) {
+        _saleStatus = SaleStatus.completed;
+      } else {
+        final totalPaid = _calculateTotalPaid();
+        final totalSale = _calculateTotal();
+        
+        if (totalPaid >= totalSale) {
+          _saleStatus = SaleStatus.completed;
+        } else {
+          _saleStatus = SaleStatus.credit;
+        }
+      }
+    });
+  }
+
+  void _toggleClientType() {
+    setState(() {
+      _isUnregisteredCustomer = !_isUnregisteredCustomer;
+      if (_isUnregisteredCustomer) {
+        _selectedCustomer = null;
+        _customerSearchController.clear();
+      } else {
+        _unregisteredCustomerNameController.clear();
+        _unregisteredCustomerPhoneController.clear();
+      }
+    });
+  }
+
+  void _navigateToRegisterCustomer() async {
+    final result = await Navigator.pushNamed(context, '/customers/new');
+    if (result == true && mounted) {
+      _loadInitialData();
+    }
   }
 
   Future<void> _saveSale() async {
-    // Validar que haya cliente seleccionado
-    if (_selectedCustomer == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Debe seleccionar un cliente'),
-          backgroundColor: Colors.red,
-        ),
-      );
-      return;
-    }
-
-    // Validar que haya productos en la venta
+    // Validar que haya productos seleccionados
     if (_selectedItems.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Debe agregar al menos un producto'),
-          backgroundColor: Colors.red,
-        ),
+        const SnackBar(content: Text('Debes agregar al menos un producto a la venta'))
       );
       return;
     }
 
-    // Validar formulario
-    if (!_formKey.currentState!.validate()) {
+    // Validar que haya al menos un método de pago
+    if (_payments.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Debes agregar al menos un método de pago'))
+      );
       return;
     }
 
-    setState(() {
-      _isLoading = true;
-    });
+    // Obtener datos del cliente (registrado o no registrado)
+    String customerId = 'no_registered';
+    String? customerName;
+    
+    if (_isUnregisteredCustomer && _selectedCustomer == null) {
+      if (_unregisteredCustomerNameController.text.trim().isEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Ingresa el nombre del cliente no registrado'))
+        );
+        return;
+      }
+      customerName = _unregisteredCustomerNameController.text.trim();
+    } else if (_selectedCustomer != null) {
+      customerId = _selectedCustomer!.id;
+      customerName = _selectedCustomer!.fullName;
+    }
 
     try {
-      // Generar ID para la venta
+      // Generar IDs únicos
       final saleId = _saleService.generateSaleId();
       
-      // Actualizar IDs de los items con el ID real de la venta
-      final updatedItems = _selectedItems.map((item) => SaleItem(
-        id: _saleService.generateSaleItemId(),
-        saleId: saleId,
-        productId: item.productId,
-        productName: item.productName,
-        price: item.price,
-        quantity: item.quantity,
-        subtotal: item.subtotal,
-        discount: item.discount,
-        notes: item.notes,
-      )).toList();
+      // Preparar ítems de venta
+      final items = _selectedItems.map((item) {
+        return SaleItem(
+          id: _saleService.generateSaleItemId(),
+          saleId: saleId,
+          productId: item.productId,
+          productName: item.productName,
+          price: item.price,
+          quantity: item.quantity,
+          subtotal: item.quantity * item.price,
+          discount: 0,
+          notes: null,
+        );
+      }).toList();
       
-      // Crear objeto de venta
-      final newSale = Sale(
+      // Obtener la tasa de cambio actual
+      final dolarRate = await Product.getDolarRate();
+      
+      // Calcular subtotal y total
+      final subtotal = _calculateSubtotal();
+      final total = _calculateTotal();
+      final totalInUsd = await Sale.convertBsToUsd(total);
+      
+      // Determinar el monto total pagado
+      double totalPaid = 0;
+      for (var payment in _payments) {
+        if (payment.currency == PaymentCurrency.usd) {
+          totalPaid += payment.amountInUsd;
+        } else {
+          totalPaid += payment.amountInUsd;
+        }
+      }
+      
+      // Determinar el monto pendiente (para ventas a crédito)
+      final pendingAmount = totalInUsd - totalPaid;
+      
+      // Determinar el estado de la venta
+      SaleStatus saleStatus;
+      if (pendingAmount <= 0) {
+        saleStatus = SaleStatus.completed;
+      } else {
+        saleStatus = SaleStatus.credit;
+      }
+      
+      // Crear el objeto de venta
+      final sale = Sale(
         id: saleId,
-        customerId: _selectedCustomer!.id,
-        customerName: _selectedCustomer!.fullName,
+        customerId: customerId,
+        customerName: customerName,
         date: DateTime.now(),
-        items: updatedItems,
-        subtotal: _calculateSubtotal(),
-        tax: _calculateTax(),
-        discount: _discount,
-        total: _calculateTotal(),
-        paymentMethod: _paymentMethod,
-        status: SaleStatus.completed, // Por defecto completada
-        reference: _reference,
-        notes: _notes,
+        items: items,
+        subtotal: subtotal,
+        discount: _discountController.text.isNotEmpty ? double.parse(_discountController.text) : 0,
+        total: total,
+        totalInUsd: totalInUsd,
+        exchangeRate: dolarRate,
+        payments: _payments,
+        status: saleStatus,
+        notes: _notesController.text.isNotEmpty ? _notesController.text : null,
+        reference: null,
         createdAt: DateTime.now(),
         updatedAt: DateTime.now(),
+        paidAmount: totalPaid,
+        pendingAmount: pendingAmount,
       );
       
       // Guardar la venta
-      final success = await _saleService.createSale(newSale, updatedItems);
+      final success = await _saleService.createSale(sale, items);
       
-      if (success && mounted) {
+      if (success) {
+        // Mostrar mensaje de éxito
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Venta registrada exitosamente'),
-            backgroundColor: Colors.green,
-          ),
+          const SnackBar(content: Text('Venta registrada correctamente'))
         );
-        Navigator.pop(context, true); // Volver a la pantalla anterior con resultado exitoso
-      } else if (mounted) {
-        setState(() {
-          _isLoading = false;
-        });
+        
+        // Limpiar formulario o volver a la pantalla anterior
+        if (!mounted) return;
+        Navigator.pop(context, true);
+      } else {
+        // Mostrar mensaje de error
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Error al registrar la venta'),
-            backgroundColor: Colors.red,
-          ),
+          const SnackBar(content: Text('Error al registrar la venta'))
         );
       }
     } catch (e) {
-      setState(() {
-        _isLoading = false;
-      });
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error al registrar venta: $e'),
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
+      // Mostrar error
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error: ${e.toString()}'))
+      );
     }
   }
 
@@ -452,7 +616,11 @@ class _NewSaleScreenState extends State<NewSaleScreen> {
                             _buildSelectedProductsList(),
                             const SizedBox(height: 24),
                             
-                            // Formulario adicional (método de pago, referencia, etc.)
+                            // Sección de pagos
+                            _buildPaymentsSection(),
+                            const SizedBox(height: 24),
+                            
+                            // Formulario adicional (notas, descuento)
                             _buildAdditionalForm(),
                           ],
                         ),
@@ -472,87 +640,149 @@ class _NewSaleScreenState extends State<NewSaleScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text(
-          'Cliente',
-          style: TextStyle(
-            fontSize: 16,
-            fontWeight: FontWeight.bold,
-          ),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            const Text(
+              'Cliente',
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            Row(
+              children: [
+                TextButton.icon(
+                  onPressed: _toggleClientType,
+                  icon: Icon(
+                    _isUnregisteredCustomer ? Icons.person_off : Icons.person_add,
+                    size: 18,
+                  ),
+                  label: Text(
+                    _isUnregisteredCustomer ? 'Cliente registrado' : 'Cliente no registrado',
+                    style: const TextStyle(fontSize: 12),
+                  ),
+                ),
+                if (!_isUnregisteredCustomer)
+                  TextButton.icon(
+                    onPressed: _navigateToRegisterCustomer,
+                    icon: const Icon(Icons.add_circle_outline, size: 18),
+                    label: const Text('Nuevo', style: TextStyle(fontSize: 12)),
+                  ),
+              ],
+            ),
+          ],
         ),
         const SizedBox(height: 8),
         
-        // Campo de búsqueda de clientes
-        TextFormField(
-          controller: _customerSearchController,
-          decoration: InputDecoration(
-            hintText: 'Buscar cliente',
-            prefixIcon: const Icon(Icons.search),
-            suffixIcon: _customerSearchController.text.isNotEmpty
-                ? IconButton(
-                    icon: const Icon(Icons.clear),
-                    onPressed: () {
-                      _customerSearchController.clear();
-                      setState(() {
-                        _isSearchingCustomer = false;
-                        _selectedCustomer = null;
-                      });
-                      _loadInitialData();
-                    },
-                  )
-                : null,
-          ),
-          onChanged: _searchCustomers,
-          onTap: () {
-            setState(() {
-              _isSearchingCustomer = true;
-            });
-          },
-          validator: (value) {
-            if (_selectedCustomer == null) {
-              return 'Debe seleccionar un cliente';
-            }
-            return null;
-          },
-        ),
-        
-        // Lista de resultados de búsqueda
-        if (_isSearchingCustomer)
-          Container(
-            margin: const EdgeInsets.only(top: 4),
-            padding: const EdgeInsets.all(4),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(8),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.grey.withOpacity(0.2),
-                  spreadRadius: 1,
-                  blurRadius: 2,
-                  offset: const Offset(0, 2),
+        // Cliente no registrado
+        if (_isUnregisteredCustomer)
+          Column(
+            children: [
+              TextFormField(
+                controller: _unregisteredCustomerNameController,
+                decoration: const InputDecoration(
+                  labelText: 'Nombre del cliente',
+                  border: OutlineInputBorder(),
+                  prefixIcon: Icon(Icons.person_outline),
                 ),
-              ],
-            ),
-            constraints: const BoxConstraints(
-              maxHeight: 200,
-            ),
-            child: _customers.isEmpty
-                ? const ListTile(
-                    title: Text('No se encontraron clientes'),
-                    leading: Icon(Icons.search_off),
-                  )
-                : ListView.builder(
-                    shrinkWrap: true,
-                    itemCount: _customers.length,
-                    itemBuilder: (context, index) {
-                      final customer = _customers[index];
-                      return ListTile(
-                        title: Text(customer.fullName),
-                        subtitle: Text(customer.phone),
-                        leading: const Icon(Icons.person_outline),
-                        onTap: () => _selectCustomer(customer),
-                      );
-                    },
+                validator: (value) {
+                  if (_isUnregisteredCustomer && (value == null || value.isEmpty)) {
+                    return 'Ingrese el nombre del cliente';
+                  }
+                  return null;
+                },
+              ),
+              const SizedBox(height: 8),
+              TextFormField(
+                controller: _unregisteredCustomerPhoneController,
+                decoration: const InputDecoration(
+                  labelText: 'Teléfono (opcional)',
+                  border: OutlineInputBorder(),
+                  prefixIcon: Icon(Icons.phone_outlined),
+                ),
+                keyboardType: TextInputType.phone,
+              ),
+            ],
+          )
+        else
+          // Campo de búsqueda de clientes
+          Column(
+            children: [
+              TextFormField(
+                controller: _customerSearchController,
+                decoration: InputDecoration(
+                  hintText: 'Buscar cliente',
+                  prefixIcon: const Icon(Icons.search),
+                  suffixIcon: _customerSearchController.text.isNotEmpty
+                      ? IconButton(
+                          icon: const Icon(Icons.clear),
+                          onPressed: () {
+                            _customerSearchController.clear();
+                            setState(() {
+                              _isSearchingCustomer = false;
+                              _selectedCustomer = null;
+                            });
+                            _loadInitialData();
+                          },
+                        )
+                      : null,
+                  border: const OutlineInputBorder(),
+                ),
+                onChanged: _searchCustomers,
+                onTap: () {
+                  setState(() {
+                    _isSearchingCustomer = true;
+                  });
+                },
+                validator: (value) {
+                  if (!_isUnregisteredCustomer && _selectedCustomer == null) {
+                    return 'Debe seleccionar un cliente';
+                  }
+                  return null;
+                },
+              ),
+              
+              // Lista de resultados de búsqueda
+              if (_isSearchingCustomer)
+                Container(
+                  margin: const EdgeInsets.only(top: 4),
+                  padding: const EdgeInsets.all(4),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(8),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.grey.withOpacity(0.2),
+                        spreadRadius: 1,
+                        blurRadius: 2,
+                        offset: const Offset(0, 2),
+                      ),
+                    ],
                   ),
+                  constraints: const BoxConstraints(
+                    maxHeight: 200,
+                  ),
+                  child: _customers.isEmpty
+                      ? const ListTile(
+                          title: Text('No se encontraron clientes'),
+                          leading: Icon(Icons.search_off),
+                        )
+                      : ListView.builder(
+                          shrinkWrap: true,
+                          itemCount: _customers.length,
+                          itemBuilder: (context, index) {
+                            final customer = _customers[index];
+                            return ListTile(
+                              title: Text(customer.fullName),
+                              subtitle: Text(customer.phone),
+                              leading: const Icon(Icons.person_outline),
+                              onTap: () => _selectCustomer(customer),
+                            );
+                          },
+                        ),
+                ),
+            ],
           ),
       ],
     );
@@ -589,6 +819,7 @@ class _NewSaleScreenState extends State<NewSaleScreen> {
                     },
                   )
                 : null,
+            border: const OutlineInputBorder(),
           ),
           onChanged: _searchProducts,
           onTap: () {
@@ -651,7 +882,9 @@ class _NewSaleScreenState extends State<NewSaleScreen> {
                                 height: 40,
                                 decoration: BoxDecoration(
                                   image: DecorationImage(
-                                    image: FileImage(File(product.imageUrls.first)),
+                                    image: product.imageUrls.first.startsWith('http')
+                                      ? NetworkImage(product.imageUrls.first) as ImageProvider
+                                      : FileImage(File(product.imageUrls.first)),
                                     fit: BoxFit.cover,
                                   ),
                                   borderRadius: BorderRadius.circular(4),
@@ -858,6 +1091,104 @@ class _NewSaleScreenState extends State<NewSaleScreen> {
     );
   }
 
+  Widget _buildPaymentsSection() {
+    return Card(
+      elevation: 2,
+      margin: const EdgeInsets.all(8),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                const Text(
+                  'Pagos',
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                TextButton.icon(
+                  onPressed: _showAddPaymentDialog,
+                  icon: const Icon(Icons.add),
+                  label: const Text('Agregar Pago'),
+                ),
+              ],
+            ),
+            const Divider(),
+            
+            // Lista de pagos
+            if (_payments.isEmpty)
+              const Padding(
+                padding: EdgeInsets.symmetric(vertical: 16),
+                child: Center(
+                  child: Text(
+                    'No hay pagos registrados',
+                    style: TextStyle(fontStyle: FontStyle.italic, color: Colors.grey),
+                  ),
+                ),
+              )
+            else
+              ListView.builder(
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                itemCount: _payments.length,
+                itemBuilder: (context, index) {
+                  final payment = _payments[index];
+                  final currencySymbol = payment.currency == PaymentCurrency.usd ? '\$' : 'Bs';
+                  
+                  return ListTile(
+                    leading: Icon(_getPaymentMethodIcon(payment.method)),
+                    title: Text('${payment.method.toString().split('.').last} - $currencySymbol${payment.amount.toStringAsFixed(2)}'),
+                    subtitle: payment.reference != null
+                        ? Text('Ref: ${payment.reference}')
+                        : null,
+                    trailing: IconButton(
+                      icon: const Icon(Icons.delete, color: Colors.red),
+                      onPressed: () => _removePayment(index),
+                    ),
+                  );
+                },
+              ),
+            
+            const Divider(),
+            
+            // Resumen de pagos
+            Padding(
+              padding: const EdgeInsets.only(top: 8),
+              child: Column(
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      const Text('Total Pagado (USD):'),
+                      Text('\$${_calculateTotalPaid().toStringAsFixed(2)}', 
+                        style: const TextStyle(fontWeight: FontWeight.bold)),
+                    ],
+                  ),
+                  const SizedBox(height: 4),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      const Text('Saldo Pendiente (USD):'),
+                      Text('\$${_calculatePendingAmount().toStringAsFixed(2)}',
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          color: _calculatePendingAmount() > 0 ? Colors.red : Colors.green,
+                        )),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   Widget _buildAdditionalForm() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -881,52 +1212,6 @@ class _NewSaleScreenState extends State<NewSaleScreen> {
             padding: const EdgeInsets.all(16),
             child: Column(
               children: [
-                // Método de pago
-                DropdownButtonFormField<PaymentMethod>(
-                  value: _paymentMethod,
-                  decoration: const InputDecoration(
-                    labelText: 'Método de pago',
-                    prefixIcon: Icon(Icons.payment),
-                  ),
-                  items: PaymentMethod.values.map((method) {
-                    return DropdownMenuItem<PaymentMethod>(
-                      value: method,
-                      child: Row(
-                        children: [
-                          Icon(Sale.getPaymentMethodIcon(method), size: 18),
-                          const SizedBox(width: 8),
-                          Text(Sale.paymentMethodToString(method)),
-                        ],
-                      ),
-                    );
-                  }).toList(),
-                  onChanged: (value) {
-                    if (value != null) {
-                      setState(() {
-                        _paymentMethod = value;
-                      });
-                    }
-                  },
-                ),
-                const SizedBox(height: 16),
-                
-                // Referencia (opcional, solo para transferencias, etc.)
-                if (_paymentMethod != PaymentMethod.cash)
-                  TextFormField(
-                    controller: _referenceController,
-                    decoration: const InputDecoration(
-                      labelText: 'Referencia',
-                      prefixIcon: Icon(Icons.numbers),
-                      hintText: 'Número de referencia (opcional)',
-                    ),
-                    onChanged: (value) {
-                      _reference = value.isNotEmpty ? value : null;
-                    },
-                  ),
-                
-                if (_paymentMethod != PaymentMethod.cash)
-                  const SizedBox(height: 16),
-                
                 // Descuento
                 TextFormField(
                   controller: _discountController,
@@ -934,6 +1219,7 @@ class _NewSaleScreenState extends State<NewSaleScreen> {
                     labelText: 'Descuento',
                     prefixIcon: Icon(Icons.discount),
                     hintText: '0.00',
+                    border: OutlineInputBorder(),
                   ),
                   keyboardType: const TextInputType.numberWithOptions(decimal: true),
                   onChanged: (value) {
@@ -977,6 +1263,7 @@ class _NewSaleScreenState extends State<NewSaleScreen> {
                     labelText: 'Notas',
                     prefixIcon: Icon(Icons.note),
                     hintText: 'Notas adicionales (opcional)',
+                    border: OutlineInputBorder(),
                   ),
                   maxLines: 3,
                   onChanged: (value) {
@@ -1013,14 +1300,6 @@ class _NewSaleScreenState extends State<NewSaleScreen> {
             children: [
               const Text('Subtotal'),
               Text(currencyFormat.format(_calculateSubtotal())),
-            ],
-          ),
-          const SizedBox(height: 4),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text('IVA (${_taxRate.toStringAsFixed(0)}%)'),
-              Text(currencyFormat.format(_calculateTax())),
             ],
           ),
           if (_discount > 0) ...[
@@ -1084,5 +1363,154 @@ class _NewSaleScreenState extends State<NewSaleScreen> {
         ],
       ),
     );
+  }
+
+  // Método para abrir el diálogo de agregar pago
+  void _showAddPaymentDialog() {
+    PaymentMethod _selectedMethod = PaymentMethod.cash;
+    PaymentCurrency _selectedCurrency = PaymentCurrency.usd;
+    final _amountController = TextEditingController();
+    final _referenceController = TextEditingController();
+
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Agregar Pago'),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // Método de pago
+              DropdownButtonFormField<PaymentMethod>(
+                decoration: const InputDecoration(
+                  labelText: 'Método de pago',
+                  border: OutlineInputBorder(),
+                ),
+                value: _selectedMethod,
+                items: PaymentMethod.values.map((method) {
+                  return DropdownMenuItem<PaymentMethod>(
+                    value: method,
+                    child: Text(method.toString().split('.').last),
+                  );
+                }).toList(),
+                onChanged: (value) {
+                  if (value != null) {
+                    _selectedMethod = value;
+                  }
+                },
+              ),
+              const SizedBox(height: 16),
+              
+              // Moneda
+              DropdownButtonFormField<PaymentCurrency>(
+                decoration: const InputDecoration(
+                  labelText: 'Moneda',
+                  border: OutlineInputBorder(),
+                ),
+                value: _selectedCurrency,
+                items: PaymentCurrency.values.map((currency) {
+                  return DropdownMenuItem<PaymentCurrency>(
+                    value: currency,
+                    child: Text(currency == PaymentCurrency.usd ? 'Dólares (\$)' : 'Bolívares (Bs)'),
+                  );
+                }).toList(),
+                onChanged: (value) {
+                  if (value != null) {
+                    _selectedCurrency = value;
+                  }
+                },
+              ),
+              const SizedBox(height: 16),
+              
+              // Monto
+              TextFormField(
+                controller: _amountController,
+                decoration: const InputDecoration(
+                  labelText: 'Monto',
+                  border: OutlineInputBorder(),
+                ),
+                keyboardType: TextInputType.numberWithOptions(decimal: true),
+                validator: (value) {
+                  if (value == null || value.isEmpty) {
+                    return 'Ingrese un monto';
+                  }
+                  if (double.tryParse(value) == null) {
+                    return 'Ingrese un monto válido';
+                  }
+                  return null;
+                },
+              ),
+              const SizedBox(height: 16),
+              
+              // Referencia (para transferencia, etc.)
+              TextFormField(
+                controller: _referenceController,
+                decoration: const InputDecoration(
+                  labelText: 'Referencia (opcional)',
+                  border: OutlineInputBorder(),
+                ),
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancelar'),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              // Validar que haya un monto
+              if (_amountController.text.isEmpty || double.tryParse(_amountController.text) == null) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Ingrese un monto válido')),
+                );
+                return;
+              }
+              
+              final amount = double.parse(_amountController.text);
+              
+              // Obtener tasa de cambio y calcular monto en USD
+              double exchangeRate = 1.0;
+              double amountInUsd = amount;
+              
+              if (_selectedCurrency == PaymentCurrency.bsf) {
+                final dolarRate = await Product.getDolarRate();
+                exchangeRate = dolarRate;
+                amountInUsd = amount / dolarRate;
+              }
+              
+              // Generar ID único para el pago
+              final paymentId = _saleService.generatePaymentId();
+              
+              // Crear objeto de pago
+              final payment = PaymentDetail(
+                id: paymentId,
+                method: _selectedMethod,
+                amount: amount,
+                currency: _selectedCurrency,
+                exchangeRate: exchangeRate,
+                amountInUsd: amountInUsd,
+                reference: _referenceController.text.isNotEmpty ? _referenceController.text : null,
+                date: DateTime.now(),
+              );
+              
+              // Agregar el pago a la lista
+              setState(() {
+                _payments.add(payment);
+              });
+              
+              Navigator.pop(context);
+            },
+            child: const Text('Agregar'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // Obtener icono para método de pago
+  IconData _getPaymentMethodIcon(PaymentMethod method) {
+    return Sale.getPaymentMethodIcon(method);
   }
 } 

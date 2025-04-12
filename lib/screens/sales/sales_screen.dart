@@ -203,6 +203,18 @@ class _SalesScreenState extends State<SalesScreen> {
         backgroundColor: AppTheme.backgroundColor,
         elevation: 0,
         actions: [
+          // Botón para ventas a crédito
+          IconButton(
+            icon: const Icon(Icons.payment_outlined),
+            onPressed: () => Navigator.pushNamed(context, '/sales/credit'),
+            tooltip: 'Ventas a crédito',
+          ),
+          // Botón para gestión de deudas
+          IconButton(
+            icon: const Icon(Icons.account_balance_wallet_outlined),
+            onPressed: () => Navigator.pushNamed(context, '/sales/debts'),
+            tooltip: 'Gestión de deudas',
+          ),
           // Botón de filtros
           IconButton(
             icon: const Icon(Icons.filter_list),
@@ -219,24 +231,24 @@ class _SalesScreenState extends State<SalesScreen> {
             )
           : _sales.isEmpty
               ? Center(
-                  child: Column(
+                      child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
+                        children: [
                       const Icon(
                         Icons.receipt_long_outlined,
                         size: 80,
                         color: Colors.grey,
                       ),
                       const SizedBox(height: 16),
-                      const Text(
+                          const Text(
                         'No hay ventas disponibles',
-                        style: TextStyle(
+                            style: TextStyle(
                           fontSize: 18,
                           color: Colors.grey,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                      const SizedBox(height: 8),
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                          const SizedBox(height: 8),
                       Text(
                         (_filterStatus != 'Todas' || _startDate != null)
                             ? 'Prueba a cambiar los filtros'
@@ -329,13 +341,13 @@ class _SalesScreenState extends State<SalesScreen> {
               Row(
                 children: [
                   // Fecha
-                  Expanded(
-                    child: Column(
+                Expanded(
+                      child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Text(
+                        children: [
+                          const Text(
                           'Fecha',
-                          style: TextStyle(
+                            style: TextStyle(
                             color: Colors.grey,
                             fontSize: 12,
                           ),
@@ -344,7 +356,7 @@ class _SalesScreenState extends State<SalesScreen> {
                           DateFormat('dd/MM/yyyy – HH:mm').format(sale.date),
                           style: const TextStyle(
                             fontWeight: FontWeight.bold,
-                            fontSize: 16,
+                              fontSize: 16,
                           ),
                         ),
                       ],
@@ -363,15 +375,15 @@ class _SalesScreenState extends State<SalesScreen> {
                     ),
                     child: Text(
                       Sale.statusToString(sale.status),
-                      style: TextStyle(
+                            style: TextStyle(
                         fontSize: 12,
-                        fontWeight: FontWeight.bold,
+                              fontWeight: FontWeight.bold,
                         color: Sale.getStatusColor(sale.status),
                       ),
-                    ),
-                  ),
-                ],
-              ),
+                            ),
+                          ),
+                        ],
+                      ),
               const SizedBox(height: 12),
               
               // Cliente
@@ -433,7 +445,7 @@ class _SalesScreenState extends State<SalesScreen> {
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Expanded(
+          Expanded(
                         child: Text(
                           '${item.quantity} x ${item.productName}',
                           style: const TextStyle(fontSize: 14),
@@ -483,9 +495,9 @@ class _SalesScreenState extends State<SalesScreen> {
                       fontSize: 18,
                       fontWeight: FontWeight.bold,
                       color: AppTheme.primaryColor,
-                    ),
-                  ),
-                ],
+            ),
+          ),
+        ],
               ),
             ],
           ),

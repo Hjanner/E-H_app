@@ -5,6 +5,7 @@ import 'package:ehstore_app/screens/more/supplier/supplier_list_screen.dart';
 import 'package:ehstore_app/screens/more/customers/customers_screen.dart';
 import 'package:ehstore_app/screens/reports/reports_screen.dart';
 import 'package:ehstore_app/screens/settings/settings_screen.dart';
+import 'package:ehstore_app/screens/more/dolar_screen.dart';
 
 class MoreScreen extends StatelessWidget {
   const MoreScreen({super.key});
@@ -55,6 +56,18 @@ class MoreScreen extends StatelessWidget {
                 context,
                 MaterialPageRoute(
                   builder: (context) => const SupplierListScreen(),
+                ),
+              ),
+            ),
+            _buildMenuOption(
+              context,
+              title: 'Tasa del Dólar',
+              icon: Icons.attach_money,
+              color: Colors.blue.shade700,
+              onTap: () => Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => const DolarScreen(),
                 ),
               ),
             ),

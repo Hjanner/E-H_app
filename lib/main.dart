@@ -10,6 +10,8 @@ import 'screens/inventory/products_screen.dart';
 import 'package:ehstore_app/screens/sales/sales_screen.dart';
 import 'package:ehstore_app/screens/sales/new_sale_screen.dart';
 import 'package:ehstore_app/screens/sales/sale_detail_screen.dart';
+import 'package:ehstore_app/screens/sales/credit_sales_screen.dart';
+import 'package:ehstore_app/screens/sales/customer_debts_screen.dart';
 
 void main() {
   runApp(const MyApp());
@@ -31,11 +33,14 @@ class MyApp extends StatelessWidget {
         '/customer_form': (context) => CustomerFormScreen(
               customer: ModalRoute.of(context)?.settings.arguments as dynamic,
             ),
+        // Rutas para ventas
         '/sales': (context) => const SalesScreen(),
         '/sales/new': (context) => const NewSaleScreen(),
         '/sales/detail': (context) => SaleDetailScreen(
-          saleId: ModalRoute.of(context)!.settings.arguments as String,
+          saleId: (ModalRoute.of(context)!.settings.arguments as Map<String, dynamic>)['saleId'] as String,
         ),
+        '/sales/credit': (context) => const CreditSalesScreen(),
+        '/sales/debts': (context) => const CustomerDebtsScreen(),
       },
       onGenerateRoute: (settings) {
         if (settings.name == '/customer_detail') {
