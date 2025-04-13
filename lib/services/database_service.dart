@@ -7,6 +7,7 @@ import '../models/product.dart';
 import '../models/category.dart';
 import '../models/supplier.dart';
 import '../models/customer.dart';
+import '../models/sale.dart';
 import 'package:flutter/material.dart';
 import 'package:uuid/uuid.dart';
 
@@ -29,7 +30,7 @@ class DatabaseService {
     String path = join(documentsDirectory.path, 'ehstore.db');
     return await openDatabase(
       path,
-      version: 5, // Incrementar versión para la nueva migración
+      version: 6, // Incrementado para incluir las tablas de ventas
       onCreate: _onCreate,
       onUpgrade: _onUpgrade,
     );
@@ -135,98 +136,190 @@ class DatabaseService {
         FOREIGN KEY (product_id) REFERENCES products (id) ON DELETE CASCADE
       )
     ''');
+    
+    // Tabla de ventas
+    await db.execute('''
+      CREATE TABLE sales(
+        id TEXT PRIMARY KEY,
+        customer_id TEXT NOT NULL,
+        total REAL NOT NULL,
+        total_paid REAL NOT NULL,
+        status TEXT NOT NULL,
+        notes TEXT NOT NULL,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL,
+        FOREIGN KEY (customer_id) REFERENCES customers (id) ON DELETE RESTRICT
+      )
+    ''');
+    
+    // Tabla de ítems de venta
+    await db.execute('''
+      CREATE TABLE sale_items(
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        sale_id TEXT NOT NULL,
+        product_id TEXT NOT NULL,
+        product_name TEXT NOT NULL,
+        price REAL NOT NULL,
+        price_in_bs REAL NOT NULL,
+        quantity INTEGER NOT NULL,
+        subtotal REAL NOT NULL,
+        subtotal_in_bs REAL NOT NULL,
+        FOREIGN KEY (sale_id) REFERENCES sales (id) ON DELETE CASCADE,
+        FOREIGN KEY (product_id) REFERENCES products (id) ON DELETE RESTRICT
+      )
+    ''');
+    
+    // Tabla de pagos
+    await db.execute('''
+      CREATE TABLE payments(
+        id TEXT PRIMARY KEY,
+        sale_id TEXT NOT NULL,
+        method TEXT NOT NULL,
+        amount REAL NOT NULL,
+        reference_number TEXT,
+        date TEXT NOT NULL,
+        FOREIGN KEY (sale_id) REFERENCES sales (id) ON DELETE CASCADE
+      )
+    ''');
+    
+    // Tabla de deudas
+    await db.execute('''
+      CREATE TABLE debts(
+        id TEXT PRIMARY KEY,
+        sale_id TEXT NOT NULL,
+        customer_id TEXT NOT NULL,
+        total_amount REAL NOT NULL,
+        paid_amount REAL NOT NULL,
+        is_paid INTEGER NOT NULL,
+        due_date TEXT NOT NULL,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL,
+        FOREIGN KEY (sale_id) REFERENCES sales (id) ON DELETE CASCADE,
+        FOREIGN KEY (customer_id) REFERENCES customers (id) ON DELETE RESTRICT
+      )
+    ''');
+    
+    // Tabla de pagos de deudas
+    await db.execute('''
+      CREATE TABLE debt_payments(
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        debt_id TEXT NOT NULL,
+        payment_id TEXT NOT NULL,
+        FOREIGN KEY (debt_id) REFERENCES debts (id) ON DELETE CASCADE,
+        FOREIGN KEY (payment_id) REFERENCES payments (id) ON DELETE CASCADE
+      )
+    ''');
   }
 
   Future<void> _onUpgrade(Database db, int oldVersion, int newVersion) async {
     if (oldVersion < 2) {
-      // Si la versión anterior es menor que 2, crear la tabla de categorías
-      await db.execute('''
-        CREATE TABLE categories(
-          id TEXT PRIMARY KEY,
-          name TEXT NOT NULL,
-          description TEXT NOT NULL,
-          icon TEXT NOT NULL,
-          color TEXT NOT NULL,
-          created_at TEXT NOT NULL,
-          updated_at TEXT NOT NULL
-        )
-      ''');
+      // Verificar si la tabla categories ya existe
+      final List<Map<String, dynamic>> tableExists = await db.rawQuery(
+        "SELECT name FROM sqlite_master WHERE type='table' AND name='categories'"
+      );
+      
+      if (tableExists.isEmpty) {
+        // Si la tabla no existe, crearla
+        await db.execute('''
+          CREATE TABLE categories(
+            id TEXT PRIMARY KEY,
+            name TEXT NOT NULL,
+            description TEXT NOT NULL,
+            icon TEXT NOT NULL,
+            color TEXT NOT NULL,
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL
+          )
+        ''');
 
-      // Insertar categorías por defecto
-      await _insertDefaultCategories(db);
-
-      // Actualizar la tabla de productos para añadir la referencia a categorías
-      // Primero, obtener los productos existentes
-      final List<Map<String, dynamic>> existingProducts = await db.query('products');
-
-      // Crear una tabla temporal para los productos
-      await db.execute('''
-        CREATE TABLE temp_products(
-          id TEXT PRIMARY KEY,
-          name TEXT NOT NULL,
-          description TEXT NOT NULL,
-          price REAL NOT NULL,
-          current_stock INTEGER NOT NULL,
-          minimum_stock INTEGER NOT NULL,
-          category_id TEXT NOT NULL,
-          supplier_id TEXT NOT NULL,
-          created_at TEXT NOT NULL,
-          updated_at TEXT NOT NULL,
-          FOREIGN KEY (category_id) REFERENCES categories (id) ON DELETE CASCADE
-        )
-      ''');
-
-      // Insertar los productos existentes en la tabla temporal,
-      // asignándoles la categoría por defecto (electrónica)
-      for (var product in existingProducts) {
-        await db.insert(
-          'temp_products',
-          {
-            'id': product['id'],
-            'name': product['name'],
-            'description': product['description'],
-            'price': product['price'],
-            'current_stock': product['current_stock'],
-            'minimum_stock': product['minimum_stock'],
-            'category_id': product['category_id'], // Mantener la categoría existente
-            'supplier_id': product['supplier_id'],
-            'created_at': product['created_at'],
-            'updated_at': product['updated_at'],
-          },
-        );
+        // Insertar categorías por defecto
+        await _insertDefaultCategories(db);
       }
 
-      // Eliminar la tabla original de productos
-      await db.execute('DROP TABLE products');
+      // Actualizar la tabla de productos para añadir la referencia a categorías
+      final tableInfo = await db.rawQuery("PRAGMA table_info(products)");
+      final hasCategoryIdColumn = tableInfo.any((column) => column['name'] == 'category_id');
+      
+      if (!hasCategoryIdColumn) {
+        // Primero, obtener los productos existentes
+        final List<Map<String, dynamic>> existingProducts = await db.query('products');
 
-      // Renombrar la tabla temporal como la tabla principal
-      await db.execute('ALTER TABLE temp_products RENAME TO products');
+        // Crear una tabla temporal para los productos
+        await db.execute('''
+          CREATE TABLE temp_products(
+            id TEXT PRIMARY KEY,
+            name TEXT NOT NULL,
+            description TEXT NOT NULL,
+            price REAL NOT NULL,
+            current_stock INTEGER NOT NULL,
+            minimum_stock INTEGER NOT NULL,
+            category_id TEXT NOT NULL,
+            supplier_id TEXT NOT NULL,
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL,
+            FOREIGN KEY (category_id) REFERENCES categories (id) ON DELETE CASCADE
+          )
+        ''');
+
+        // Insertar los productos existentes en la tabla temporal,
+        // asignándoles la categoría por defecto (electrónica)
+        for (var product in existingProducts) {
+          await db.insert(
+            'temp_products',
+            {
+              'id': product['id'],
+              'name': product['name'],
+              'description': product['description'],
+              'price': product['price'],
+              'current_stock': product['current_stock'],
+              'minimum_stock': product['minimum_stock'],
+              'category_id': product['category_id'] ?? 'electrónica', // Mantener la categoría existente o usar la predeterminada
+              'supplier_id': product['supplier_id'] ?? 'samsung', // Mantener el proveedor existente o usar el predeterminado
+              'created_at': product['created_at'],
+              'updated_at': product['updated_at'],
+            },
+          );
+        }
+
+        // Eliminar la tabla original de productos
+        await db.execute('DROP TABLE products');
+
+        // Renombrar la tabla temporal como la tabla principal
+        await db.execute('ALTER TABLE temp_products RENAME TO products');
+      }
     }
     
     if (oldVersion < 3) {
-      // Si la versión anterior es menor que 3, crear la tabla de proveedores
-      await db.execute('''
-        CREATE TABLE suppliers(
-          id TEXT PRIMARY KEY,
-          business_name TEXT NOT NULL,
-          legal_name TEXT NOT NULL,
-          tax_id TEXT NOT NULL,
-          address TEXT NOT NULL,
-          phone TEXT NOT NULL,
-          email TEXT NOT NULL,
-          contact_person TEXT NOT NULL,
-          is_active INTEGER NOT NULL,
-          notes TEXT NOT NULL,
-          instagram TEXT NOT NULL,
-          mercado_libre TEXT NOT NULL,
-          website TEXT NOT NULL,
-          created_at TEXT NOT NULL,
-          updated_at TEXT NOT NULL
-        )
-      ''');
+      // Verificar si la tabla suppliers ya existe
+      final List<Map<String, dynamic>> tableExists = await db.rawQuery(
+        "SELECT name FROM sqlite_master WHERE type='table' AND name='suppliers'"
+      );
       
-      // Insertar proveedores por defecto
-      await _insertDefaultSuppliers(db);
+      if (tableExists.isEmpty) {
+        // Si la versión anterior es menor que 3, crear la tabla de proveedores
+        await db.execute('''
+          CREATE TABLE suppliers(
+            id TEXT PRIMARY KEY,
+            business_name TEXT NOT NULL,
+            legal_name TEXT NOT NULL,
+            tax_id TEXT NOT NULL,
+            address TEXT NOT NULL,
+            phone TEXT NOT NULL,
+            email TEXT NOT NULL,
+            contact_person TEXT NOT NULL,
+            is_active INTEGER NOT NULL,
+            notes TEXT NOT NULL,
+            instagram TEXT NOT NULL,
+            mercado_libre TEXT NOT NULL,
+            website TEXT NOT NULL,
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL
+          )
+        ''');
+        
+        // Insertar proveedores por defecto
+        await _insertDefaultSuppliers(db);
+      }
       
       // Verificar si los productos tienen una relación con proveedores
       final tableInfo = await db.rawQuery("PRAGMA table_info(products)");
@@ -353,26 +446,140 @@ class DatabaseService {
     
     // Migración para añadir la tabla de clientes
     if (oldVersion < 5) {
-      // Tabla de clientes
-      await db.execute('''
-        CREATE TABLE customers(
-          id TEXT PRIMARY KEY,
-          first_name TEXT NOT NULL,
-          last_name TEXT NOT NULL,
-          email TEXT NOT NULL,
-          phone TEXT NOT NULL,
-          address TEXT NOT NULL,
-          notes TEXT NOT NULL,
-          document_id TEXT NOT NULL,
-          document_type TEXT NOT NULL,
-          is_active INTEGER NOT NULL,
-          created_at TEXT NOT NULL,
-          updated_at TEXT NOT NULL
-        )
-      ''');
+      // Verificar si la tabla customers ya existe
+      final List<Map<String, dynamic>> customersExists = await db.rawQuery(
+        "SELECT name FROM sqlite_master WHERE type='table' AND name='customers'"
+      );
       
-      // Insertar clientes por defecto
-      await _insertDefaultCustomers(db);
+      if (customersExists.isEmpty) {
+        // Tabla de clientes
+        await db.execute('''
+          CREATE TABLE customers(
+            id TEXT PRIMARY KEY,
+            first_name TEXT NOT NULL,
+            last_name TEXT NOT NULL,
+            email TEXT NOT NULL,
+            phone TEXT NOT NULL,
+            address TEXT NOT NULL,
+            notes TEXT NOT NULL,
+            document_id TEXT NOT NULL,
+            document_type TEXT NOT NULL,
+            is_active INTEGER NOT NULL,
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL
+          )
+        ''');
+        
+        // Insertar clientes por defecto
+        await _insertDefaultCustomers(db);
+      }
+    }
+    
+    // Migración para añadir las tablas de ventas
+    if (oldVersion < 6) {
+      // Verificar si las tablas ya existen antes de crearlas
+      final List<Map<String, dynamic>> salesExists = await db.rawQuery(
+        "SELECT name FROM sqlite_master WHERE type='table' AND name='sales'"
+      );
+      
+      if (salesExists.isEmpty) {
+        // Tabla de ventas
+        await db.execute('''
+          CREATE TABLE sales(
+            id TEXT PRIMARY KEY,
+            customer_id TEXT NOT NULL,
+            total REAL NOT NULL,
+            total_paid REAL NOT NULL,
+            status TEXT NOT NULL,
+            notes TEXT NOT NULL,
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL,
+            FOREIGN KEY (customer_id) REFERENCES customers (id) ON DELETE RESTRICT
+          )
+        ''');
+      }
+      
+      final List<Map<String, dynamic>> saleItemsExists = await db.rawQuery(
+        "SELECT name FROM sqlite_master WHERE type='table' AND name='sale_items'"
+      );
+      
+      if (saleItemsExists.isEmpty) {
+        // Tabla de ítems de venta
+        await db.execute('''
+          CREATE TABLE sale_items(
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            sale_id TEXT NOT NULL,
+            product_id TEXT NOT NULL,
+            product_name TEXT NOT NULL,
+            price REAL NOT NULL,
+            price_in_bs REAL NOT NULL,
+            quantity INTEGER NOT NULL,
+            subtotal REAL NOT NULL,
+            subtotal_in_bs REAL NOT NULL,
+            FOREIGN KEY (sale_id) REFERENCES sales (id) ON DELETE CASCADE,
+            FOREIGN KEY (product_id) REFERENCES products (id) ON DELETE RESTRICT
+          )
+        ''');
+      }
+      
+      final List<Map<String, dynamic>> paymentsExists = await db.rawQuery(
+        "SELECT name FROM sqlite_master WHERE type='table' AND name='payments'"
+      );
+      
+      if (paymentsExists.isEmpty) {
+        // Tabla de pagos
+        await db.execute('''
+          CREATE TABLE payments(
+            id TEXT PRIMARY KEY,
+            sale_id TEXT NOT NULL,
+            method TEXT NOT NULL,
+            amount REAL NOT NULL,
+            reference_number TEXT,
+            date TEXT NOT NULL,
+            FOREIGN KEY (sale_id) REFERENCES sales (id) ON DELETE CASCADE
+          )
+        ''');
+      }
+      
+      final List<Map<String, dynamic>> debtsExists = await db.rawQuery(
+        "SELECT name FROM sqlite_master WHERE type='table' AND name='debts'"
+      );
+      
+      if (debtsExists.isEmpty) {
+        // Tabla de deudas
+        await db.execute('''
+          CREATE TABLE debts(
+            id TEXT PRIMARY KEY,
+            sale_id TEXT NOT NULL,
+            customer_id TEXT NOT NULL,
+            total_amount REAL NOT NULL,
+            paid_amount REAL NOT NULL,
+            is_paid INTEGER NOT NULL,
+            due_date TEXT NOT NULL,
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL,
+            FOREIGN KEY (sale_id) REFERENCES sales (id) ON DELETE CASCADE,
+            FOREIGN KEY (customer_id) REFERENCES customers (id) ON DELETE RESTRICT
+          )
+        ''');
+      }
+      
+      final List<Map<String, dynamic>> debtPaymentsExists = await db.rawQuery(
+        "SELECT name FROM sqlite_master WHERE type='table' AND name='debt_payments'"
+      );
+      
+      if (debtPaymentsExists.isEmpty) {
+        // Tabla de pagos de deudas
+        await db.execute('''
+          CREATE TABLE debt_payments(
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            debt_id TEXT NOT NULL,
+            payment_id TEXT NOT NULL,
+            FOREIGN KEY (debt_id) REFERENCES debts (id) ON DELETE CASCADE,
+            FOREIGN KEY (payment_id) REFERENCES payments (id) ON DELETE CASCADE
+          )
+        ''');
+      }
     }
   }
 

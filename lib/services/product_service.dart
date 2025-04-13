@@ -64,6 +64,9 @@ class ProductService {
     }).toList();
   }
 
+Future<List<Product>> searchProducts(String query) async {
+  return await _dbService.searchProducts(query);
+}
 
   // Crear producto
   Future<Product> createProduct({
