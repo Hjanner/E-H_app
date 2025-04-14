@@ -80,13 +80,13 @@ class ProductCard extends StatelessWidget {
                         fontWeight: FontWeight.w600,
                       ),
                     ),
-                    Text(
-                      'Bs ${product.priceInBs.toStringAsFixed(2)}',
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: Colors.grey[700],
-                      ),
-                    ),
+                    // Text(
+                    //   'Bs ${product.priceInBs.toStringAsFixed(2)}',
+                    //   style: TextStyle(
+                    //     fontSize: 12,
+                    //     color: Colors.grey[700],
+                    //   ),
+                    // ),
                   ],
                 ),
                 const SizedBox(height: 6),
