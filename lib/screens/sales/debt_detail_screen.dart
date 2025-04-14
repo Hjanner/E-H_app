@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:ehstore_app/models/sale.dart';
 import 'package:ehstore_app/models/customer.dart';
+import 'package:ehstore_app/models/product.dart';
 import 'package:ehstore_app/services/sale_service.dart';
 import 'package:ehstore_app/services/customer_service.dart';
 import 'package:ehstore_app/theme/app_theme.dart';
@@ -32,17 +34,54 @@ class _DebtDetailScreenState extends State<DebtDetailScreen> {
   final TextEditingController _amountController = TextEditingController();
   final TextEditingController _referenceController = TextEditingController();
   
+  // Controlador para el monto equivalente en la otra moneda
+  final TextEditingController _equivalentAmountController = TextEditingController();
+  
+  // Flag para saber si el usuario está ingresando en bolívares
+  bool _isAmountInBs = false;
+  
   @override
   void initState() {
     super.initState();
     _loadDebtDetails();
+    
+    // Escuchar cambios en el campo de monto para actualizar el equivalente
+    _amountController.addListener(_updateEquivalentAmount);
+    
+    // Inicializar el método de pago como USD por defecto
+    _isAmountInBs = false;
   }
   
   @override
   void dispose() {
     _amountController.dispose();
     _referenceController.dispose();
+    _equivalentAmountController.dispose();
     super.dispose();
+  }
+  
+  // Actualiza el monto equivalente basado en el monto ingresado y el método de pago
+  void _updateEquivalentAmount() {
+    if (_amountController.text.isEmpty) {
+      _equivalentAmountController.text = '';
+      return;
+    }
+    
+    try {
+      final amount = double.parse(_amountController.text);
+      
+      if (_isAmountInBs) {
+        // Convertir de Bs a USD
+        final amountInUsd = amount / Product.exchangeRate;
+        _equivalentAmountController.text = amountInUsd.toStringAsFixed(2);
+      } else {
+        // Convertir de USD a Bs
+        final amountInBs = amount * Product.exchangeRate;
+        _equivalentAmountController.text = amountInBs.toStringAsFixed(2);
+      }
+    } catch (e) {
+      _equivalentAmountController.text = '';
+    }
   }
   
   Future<void> _loadDebtDetails() async {
@@ -89,11 +128,25 @@ class _DebtDetailScreenState extends State<DebtDetailScreen> {
     }
   }
   
+  // Actualiza el flag de moneda según el método de pago seleccionado
+  void _updateCurrencyFlag(PaymentMethod method) {
+    setState(() {
+      // Para métodos electrónicos y efectivo en bolivares, el monto se ingresa en Bs
+      _isAmountInBs = method == PaymentMethod.cashBs || 
+                     method == PaymentMethod.bankTransfer || 
+                     method == PaymentMethod.mobilePayment;
+      
+      // Limpiar los campos para evitar confusiones
+      _amountController.clear();
+      _equivalentAmountController.clear();
+    });
+  }
+  
   // Registrar un pago para la deuda
   Future<void> _registerPayment() async {
     // Validar monto
-    final amount = double.tryParse(_amountController.text);
-    if (amount == null || amount <= 0) {
+    final amountText = _amountController.text;
+    if (amountText.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('Ingrese un monto válido'),
@@ -103,11 +156,32 @@ class _DebtDetailScreenState extends State<DebtDetailScreen> {
       return;
     }
     
-    // Validar que el monto no sea mayor al saldo pendiente
-    if (amount > _debt!.pendingAmount) {
+    final amount = double.tryParse(amountText);
+    if (amount == null || amount <= 0) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('El monto no puede ser mayor al saldo pendiente'),
+          content: Text('Ingrese un monto válido mayor a cero'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
+    
+    // Calcular el monto en USD para validación (independientemente de cómo se ingresó)
+    double amountInUsd;
+    if (_isAmountInBs) {
+      // El monto se ingresó en Bs, convertir a USD
+      amountInUsd = amount / Product.exchangeRate;
+    } else {
+      // El monto ya está en USD
+      amountInUsd = amount;
+    }
+    
+    // Validar que el monto no sea mayor al saldo pendiente
+    if (amountInUsd > _debt!.pendingAmount) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('El monto no puede ser mayor al saldo pendiente (USD ${_debt!.pendingAmount.toStringAsFixed(2)})'),
           backgroundColor: Colors.red,
         ),
       );
@@ -132,11 +206,14 @@ class _DebtDetailScreenState extends State<DebtDetailScreen> {
     });
     
     try {
+      // Calcular el monto a registrar según la moneda seleccionada
+      final amountToRegister = _isAmountInBs ? amount : amount;
+      
       // Registrar el pago
       final success = await _saleService.registerDebtPayment(
         debtId: _debt!.id,
         method: _selectedPaymentMethod,
-        amount: amount,
+        amount: amountToRegister,
         referenceNumber: (_selectedPaymentMethod == PaymentMethod.bankTransfer || 
                           _selectedPaymentMethod == PaymentMethod.mobilePayment)
             ? _referenceController.text
@@ -154,6 +231,7 @@ class _DebtDetailScreenState extends State<DebtDetailScreen> {
         // Limpiar campos
         _amountController.clear();
         _referenceController.clear();
+        _equivalentAmountController.clear();
         
         // Recargar datos
         _loadDebtDetails();
@@ -325,12 +403,24 @@ class _DebtDetailScreenState extends State<DebtDetailScreen> {
                     fontWeight: FontWeight.bold,
                   ),
                 ),
-                Text(
-                  '\$${_debt!.totalAmount.toStringAsFixed(2)}',
-                  style: const TextStyle(
-                    fontWeight: FontWeight.bold,
-                    fontSize: 16,
-                  ),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    Text(
+                      '\$${_debt!.totalAmount.toStringAsFixed(2)}',
+                      style: const TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 16,
+                      ),
+                    ),
+                    Text(
+                      'Bs. ${(_debt!.totalAmount * Product.exchangeRate).toStringAsFixed(2)}',
+                      style: TextStyle(
+                        color: Colors.grey[600],
+                        fontSize: 12,
+                      ),
+                    ),
+                  ],
                 ),
               ],
             ),
@@ -344,13 +434,25 @@ class _DebtDetailScreenState extends State<DebtDetailScreen> {
                     fontWeight: FontWeight.bold,
                   ),
                 ),
-                Text(
-                  '\$${_debt!.paidAmount.toStringAsFixed(2)}',
-                  style: TextStyle(
-                    fontWeight: FontWeight.bold,
-                    fontSize: 16,
-                    color: _debt!.paidAmount > 0 ? Colors.green : Colors.grey,
-                  ),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    Text(
+                      '\$${_debt!.paidAmount.toStringAsFixed(2)}',
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 16,
+                        color: _debt!.paidAmount > 0 ? Colors.green : Colors.grey,
+                      ),
+                    ),
+                    Text(
+                      'Bs. ${(_debt!.paidAmount * Product.exchangeRate).toStringAsFixed(2)}',
+                      style: TextStyle(
+                        color: Colors.grey[600],
+                        fontSize: 12,
+                      ),
+                    ),
+                  ],
                 ),
               ],
             ),
@@ -366,13 +468,25 @@ class _DebtDetailScreenState extends State<DebtDetailScreen> {
                         fontWeight: FontWeight.bold,
                       ),
                     ),
-                    Text(
-                      '\$${_debt!.pendingAmount.toStringAsFixed(2)}',
-                      style: const TextStyle(
-                        fontWeight: FontWeight.bold,
-                        fontSize: 18,
-                        color: Colors.red,
-                      ),
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.end,
+                      children: [
+                        Text(
+                          '\$${_debt!.pendingAmount.toStringAsFixed(2)}',
+                          style: const TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 18,
+                            color: Colors.red,
+                          ),
+                        ),
+                        Text(
+                          'Bs. ${(_debt!.pendingAmount * Product.exchangeRate).toStringAsFixed(2)}',
+                          style: TextStyle(
+                            color: Colors.grey[600],
+                            fontSize: 12,
+                          ),
+                        ),
+                      ],
                     ),
                   ],
                 ),
@@ -486,9 +600,37 @@ class _DebtDetailScreenState extends State<DebtDetailScreen> {
                           ),
                       ],
                     ),
-                    Text(
-                      '\$${payment.amount.toStringAsFixed(2)}',
-                      style: const TextStyle(fontWeight: FontWeight.bold),
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.end,
+                      children: [
+                        // Mostramos el monto en la moneda original del pago
+                        if (payment.method == PaymentMethod.cashBs || 
+                            payment.method == PaymentMethod.bankTransfer || 
+                            payment.method == PaymentMethod.mobilePayment)
+                          Text(
+                            'Bs. ${payment.amount.toStringAsFixed(2)}',
+                            style: const TextStyle(fontWeight: FontWeight.bold),
+                          )
+                        else
+                          Text(
+                            '\$${payment.amount.toStringAsFixed(2)}',
+                            style: const TextStyle(fontWeight: FontWeight.bold),
+                          ),
+                        
+                        // Mostramos el equivalente en la otra moneda
+                        if (payment.method == PaymentMethod.cashBs || 
+                            payment.method == PaymentMethod.bankTransfer || 
+                            payment.method == PaymentMethod.mobilePayment)
+                          Text(
+                            '\$${(payment.amount / Product.exchangeRate).toStringAsFixed(2)}',
+                            style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+                          )
+                        else
+                          Text(
+                            'Bs. ${(payment.amount * Product.exchangeRate).toStringAsFixed(2)}',
+                            style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+                          ),
+                      ],
                     ),
                   ],
                 ),
@@ -527,7 +669,7 @@ class _DebtDetailScreenState extends State<DebtDetailScreen> {
                   value: PaymentMethod.cashUSD,
                   child: Row(
                     children: [
-                      const Icon(Icons.attach_money, size: 18),
+                      const Icon(Icons.attach_money, size: 18, color: Colors.green),
                       const SizedBox(width: 8),
                       const Text('Efectivo (USD)'),
                     ],
@@ -537,7 +679,7 @@ class _DebtDetailScreenState extends State<DebtDetailScreen> {
                   value: PaymentMethod.cashBs,
                   child: Row(
                     children: [
-                      const Icon(Icons.money, size: 18),
+                      const Icon(Icons.money, size: 18, color: Colors.blue),
                       const SizedBox(width: 8),
                       const Text('Efectivo (Bs)'),
                     ],
@@ -547,9 +689,9 @@ class _DebtDetailScreenState extends State<DebtDetailScreen> {
                   value: PaymentMethod.bankTransfer,
                   child: Row(
                     children: [
-                      const Icon(Icons.account_balance, size: 18),
+                      const Icon(Icons.account_balance, size: 18, color: AppTheme.primaryColor),
                       const SizedBox(width: 8),
-                      const Text('Transferencia Bancaria'),
+                      const Text('Transferencia Bancaria (Bs)'),
                     ],
                   ),
                 ),
@@ -557,9 +699,9 @@ class _DebtDetailScreenState extends State<DebtDetailScreen> {
                   value: PaymentMethod.mobilePayment,
                   child: Row(
                     children: [
-                      const Icon(Icons.phone_android, size: 18),
+                      const Icon(Icons.phone_android, size: 18, color: Colors.purple),
                       const SizedBox(width: 8),
-                      const Text('Pago Móvil'),
+                      const Text('Pago Móvil (Bs)'),
                     ],
                   ),
                 ),
@@ -568,6 +710,7 @@ class _DebtDetailScreenState extends State<DebtDetailScreen> {
                 if (value != null) {
                   setState(() {
                     _selectedPaymentMethod = value;
+                    _updateCurrencyFlag(value);
                   });
                 }
               },
@@ -576,11 +719,40 @@ class _DebtDetailScreenState extends State<DebtDetailScreen> {
             TextField(
               controller: _amountController,
               decoration: InputDecoration(
-                labelText: 'Monto (máx. \$${_debt!.pendingAmount.toStringAsFixed(2)})',
+                labelText: _isAmountInBs 
+                    ? 'Monto en Bs.' 
+                    : 'Monto en USD',
+                helperText: _isAmountInBs
+                    ? 'Máximo: Bs. ${(_debt!.pendingAmount * Product.exchangeRate).toStringAsFixed(2)}'
+                    : 'Máximo: \$${_debt!.pendingAmount.toStringAsFixed(2)}',
                 border: const OutlineInputBorder(),
-                prefixIcon: const Icon(Icons.attach_money),
+                prefixIcon: Icon(
+                  _isAmountInBs ? Icons.money : Icons.attach_money,
+                  color: _isAmountInBs ? Colors.blue : Colors.green,
+                ),
               ),
-              keyboardType: TextInputType.number,
+              keyboardType: const TextInputType.numberWithOptions(decimal: true),
+              inputFormatters: [
+                FilteringTextInputFormatter.allow(RegExp(r'^\d+\.?\d{0,2}')),
+              ],
+            ),
+            const SizedBox(height: 8),
+            TextField(
+              controller: _equivalentAmountController,
+              readOnly: true,
+              enabled: false,
+              decoration: InputDecoration(
+                labelText: _isAmountInBs 
+                    ? 'Equivalente en USD' 
+                    : 'Equivalente en Bs.',
+                border: const OutlineInputBorder(),
+                filled: true,
+                fillColor: Colors.grey.shade100,
+                prefixIcon: Icon(
+                  _isAmountInBs ? Icons.attach_money : Icons.money,
+                  color: Colors.grey,
+                ),
+              ),
             ),
             if (_selectedPaymentMethod == PaymentMethod.bankTransfer || 
                 _selectedPaymentMethod == PaymentMethod.mobilePayment)
@@ -591,7 +763,7 @@ class _DebtDetailScreenState extends State<DebtDetailScreen> {
                   decoration: const InputDecoration(
                     labelText: 'Número de referencia',
                     border: OutlineInputBorder(),
-                    prefixIcon: Icon(Icons.numbers),
+                    prefixIcon: Icon(Icons.numbers, color: AppTheme.primaryColor),
                   ),
                 ),
               ),
@@ -643,4 +815,4 @@ class _DebtDetailScreenState extends State<DebtDetailScreen> {
         return 'A Crédito';
     }
   }
-} 
+}
