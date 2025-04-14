@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'product.dart';
 
 enum SaleStatus {
   completed, // Venta completada normalmente
@@ -37,6 +38,26 @@ class Sale {
   
   // Verificar si hay un balance pendiente
   bool get hasPendingBalance => pendingBalance > 0;
+  
+  // Calcular el total pagado en dólares, considerando la conversión de bolívares
+  double get totalPaidInUSD {
+    return payments.fold(0.0, (sum, payment) => sum + payment.amountInUSD);
+  }
+  
+  // Calcular el total pagado en bolívares
+  double get totalPaidInBs {
+    return payments.fold(0.0, (sum, payment) => sum + payment.amountInBs);
+  }
+  
+  // Obtener pagos realizados en dólares
+  List<Payment> get usdPayments {
+    return payments.where((payment) => payment.method != PaymentMethod.cashBs).toList();
+  }
+  
+  // Obtener pagos realizados en bolívares
+  List<Payment> get bsPayments {
+    return payments.where((payment) => payment.method == PaymentMethod.cashBs).toList();
+  }
 
   factory Sale.fromJson(Map<String, dynamic> json) {
     return Sale(
@@ -141,6 +162,28 @@ class Payment {
     this.referenceNumber,
     required this.date,
   });
+  
+  // Obtener el monto real en dólares, considerando la conversión si es en bolívares
+  double get amountInUSD {
+    if (method == PaymentMethod.cashBs) {
+      return amount / Product.exchangeRate;
+    }
+    return amount;
+  }
+  
+  // Obtener el monto en bolívares, convirtiendo si es necesario
+  double get amountInBs {
+    if (method == PaymentMethod.cashBs) {
+      return amount;
+    }
+    return amount * Product.exchangeRate;
+  }
+  
+  // Verificar si el pago se realizó en dólares
+  bool get isUSD => method != PaymentMethod.cashBs;
+  
+  // Verificar si el pago se realizó en bolívares
+  bool get isBs => method == PaymentMethod.cashBs;
 
   factory Payment.fromJson(Map<String, dynamic> json) {
     return Payment(

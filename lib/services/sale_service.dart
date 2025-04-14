@@ -253,25 +253,43 @@ class SaleService {
         );
       }
 
-      // Insertar los pagos
+      // Procesar e insertar los pagos
+      double montoEnDolares = 0.0;
+      
       for (var payment in payments) {
+        // Si es un pago en bolívares, calcular su valor en dólares
+        double amountInUSD = payment.amount;
+        
+        if (payment.method == PaymentMethod.cashBs) {
+          // Convertir el monto de bolívares a dólares usando la tasa de cambio
+          amountInUSD = payment.amount / Product.exchangeRate;
+        }
+        
+        // Acumular el total pagado en dólares
+        if (payment.method != PaymentMethod.debt) {
+          montoEnDolares += amountInUSD;
+        }
+        
+        // Insertar el pago en la base de datos
         await txn.insert(
           'payments',
           {
             'id': payment.id,
             'sale_id': id,
             'method': payment.method.name,
-            'amount': payment.amount,
+            'amount': payment.method == PaymentMethod.cashBs ? payment.amount : amountInUSD, // Monto original (en Bs o USD)
             'reference_number': payment.referenceNumber,
             'date': payment.date.toIso8601String(),
           },
         );
       }
 
-      // Si es una venta a crédito, crear la deuda
-      if (status == SaleStatus.credit) {
+      // Si hay un balance pendiente (deuda), crear registro de deuda
+      double pendingAmount = total - montoEnDolares;
+      if (pendingAmount > 0) {
         final debtId = _uuid.v4();
-        final dueDate = now.add(const Duration(days: 30)); // Vencimiento a 30 días por defecto
+        // Vencimiento a 30 días por defecto, se puede ajustar según la política de la tienda
+        final dueDate = now.add(const Duration(days: 30)); 
         
         await txn.insert(
           'debts',
@@ -279,8 +297,8 @@ class SaleService {
             'id': debtId,
             'sale_id': id,
             'customer_id': customerId,
-            'total_amount': total,
-            'paid_amount': totalPaid,
+            'total_amount': pendingAmount, // La deuda es sólo el monto pendiente en USD
+            'paid_amount': 0, // Inicialmente no se ha pagado nada de la deuda
             'is_paid': 0, // No pagada
             'due_date': dueDate.toIso8601String(),
             'created_at': now.toIso8601String(),
@@ -288,9 +306,9 @@ class SaleService {
           },
         );
         
-        // Asociar los pagos iniciales a la deuda si hay
+        // Si hay un pago específico marcado como deuda, asociarlo
         for (var payment in payments) {
-          if (payment.method != PaymentMethod.debt) {
+          if (payment.method == PaymentMethod.debt) {
             await txn.insert(
               'debt_payments',
               {
@@ -300,6 +318,17 @@ class SaleService {
             );
           }
         }
+        
+        // Actualizar el estado de la venta a crédito
+        await txn.update(
+          'sales',
+          {
+            'status': SaleStatus.credit.name,
+            'updated_at': now.toIso8601String(),
+          },
+          where: 'id = ?',
+          whereArgs: [id],
+        );
       }
 
       return id;
@@ -456,8 +485,14 @@ class SaleService {
     final double totalAmount = debtMap['total_amount'];
     final double currentPaidAmount = debtMap['paid_amount'];
     
+    // Convertir el monto del pago a dólares si es en bolívares
+    double amountInUSD = amount;
+    if (method == PaymentMethod.cashBs) {
+      amountInUSD = amount / Product.exchangeRate;
+    }
+    
     // Verificar que el monto a pagar no exceda la deuda pendiente
-    if (currentPaidAmount + amount > totalAmount) {
+    if (currentPaidAmount + amountInUSD > totalAmount) {
       return false;
     }
     
@@ -473,7 +508,7 @@ class SaleService {
           'id': paymentId,
           'sale_id': saleId,
           'method': method.name,
-          'amount': amount,
+          'amount': method == PaymentMethod.cashBs ? amount : amountInUSD, // Guardar el monto original (en Bs o USD)
           'reference_number': referenceNumber,
           'date': now.toIso8601String(),
         },
@@ -488,8 +523,8 @@ class SaleService {
         },
       );
       
-      // Actualizar el monto pagado de la deuda
-      final newPaidAmount = currentPaidAmount + amount;
+      // Actualizar el monto pagado de la deuda (siempre en dólares)
+      final newPaidAmount = currentPaidAmount + amountInUSD;
       final isPaid = newPaidAmount >= totalAmount ? 1 : 0;
       
       await txn.update(
@@ -503,10 +538,10 @@ class SaleService {
         whereArgs: [debtId],
       );
       
-      // Actualizar el total pagado de la venta
+      // Actualizar el total pagado de la venta (siempre en dólares)
       await txn.rawUpdate(
         'UPDATE sales SET total_paid = total_paid + ?, updated_at = ? WHERE id = ?',
-        [amount, now.toIso8601String(), saleId],
+        [amountInUSD, now.toIso8601String(), saleId],
       );
       
       // Si la deuda está completamente pagada, actualizar el estado de la venta

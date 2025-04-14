@@ -1024,7 +1024,7 @@ class _NewSaleScreenState extends State<NewSaleScreen> {
         payments.add(Payment(
           id: _uuid.v4(),
           method: PaymentMethod.cashBs,
-          amount: _cashBsAmount / Product.exchangeRate, // Convertir a USD
+          amount: _cashBsAmount, // Guardar el monto original en Bs
           date: now,
         ));
       }
@@ -1051,18 +1051,28 @@ class _NewSaleScreenState extends State<NewSaleScreen> {
         ));
       }
       
-      // Crédito
-      if (_creditAmount > 0) {
+      // Calcular cuánto se ha pagado realmente en dólares
+      double totalPaidInUSD = _cashUsdAmount + (_cashBsAmount / Product.exchangeRate) +
+                              _bankTransferAmount + _mobilePaymentAmount;
+      
+      // Calcular si hay un balance pendiente como deuda
+      double pendingAmount = total - totalPaidInUSD;
+      
+      // Si hay un monto pendiente, registrarlo como crédito
+      if (pendingAmount > 0.01) { // Usar un pequeño umbral para evitar problemas de redondeo
         payments.add(Payment(
           id: _uuid.v4(),
           method: PaymentMethod.debt,
-          amount: _creditAmount,
+          amount: pendingAmount,
           date: now,
         ));
+        
+        // Marcar la venta como a crédito
+        _saleStatus = SaleStatus.credit;
+      } else {
+        // La venta está completamente pagada
+        _saleStatus = SaleStatus.completed;
       }
-      
-      // Determinar estado de la venta
-      final SaleStatus status = _creditAmount > 0 ? SaleStatus.credit : SaleStatus.completed;
       
       // Crear la venta
       final String saleId = await _saleService.createSale(
@@ -1070,8 +1080,8 @@ class _NewSaleScreenState extends State<NewSaleScreen> {
         items: _cartItems,
         payments: payments,
         total: total,
-        totalPaid: totalPaid,
-        status: status,
+        totalPaid: totalPaidInUSD, // Total pagado en dólares (convertido)
+        status: _saleStatus,
         notes: _notesController.text,
       );
       
