@@ -1,10 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:ehstore_app/theme/app_theme.dart';
 import 'package:ehstore_app/services/sale_service.dart';
-import 'package:ehstore_app/models/sale.dart';
 import 'sale_list_screen.dart';
 import 'debt_list_screen.dart';
-import 'new_sale_screen.dart';
 
 class SalesScreen extends StatefulWidget {
   const SalesScreen({super.key});
@@ -71,25 +69,26 @@ class _SalesScreenState extends State<SalesScreen> with SingleTickerProviderStat
     }
   }
 
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Ventas'),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.add),
-            onPressed: () {
-              Navigator.push(
-                context, 
-                MaterialPageRoute(
-                  builder: (context) => const NewSaleScreen(),
-                ),
-              ).then((_) => _loadSalesData());
-            },
-            tooltip: 'Nueva venta',
-          ),
-        ],
+        // actions: [
+        //   IconButton(
+        //     icon: const Icon(Icons.add),
+        //     onPressed: () {
+        //       Navigator.push(
+        //         context, 
+        //         MaterialPageRoute(
+        //           builder: (context) => const NewSaleScreen(),
+        //         ),
+        //       ).then((_) => _loadSalesData());
+        //     },
+        //     tooltip: 'Nueva venta',
+        //   ),
+        // ],
         bottom: TabBar(
           controller: _tabController,
           labelColor: AppTheme.primaryColor,
@@ -103,7 +102,7 @@ class _SalesScreenState extends State<SalesScreen> with SingleTickerProviderStat
       ),
       body: Column(
         children: [
-          _buildSalesInfo(),
+         // _buildSalesInfo(),
           Expanded(
             child: TabBarView(
               controller: _tabController,
@@ -118,94 +117,94 @@ class _SalesScreenState extends State<SalesScreen> with SingleTickerProviderStat
     );
   }
   
-  Widget _buildSalesInfo() {
-    return Padding(
-      padding: const EdgeInsets.all(16.0),
-      child: Row(
-        children: [
-          Expanded(
-            child: Card(
-              color: AppTheme.cardBackground,
-              elevation: 2,
-              child: Padding(
-                padding: const EdgeInsets.all(16.0),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text(
-                      'Ventas del Día',
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    _isLoading
-                        ? const SizedBox(
-                            height: 24,
-                            width: 24,
-                            child: CircularProgressIndicator(
-                              strokeWidth: 2,
-                              valueColor: AlwaysStoppedAnimation<Color>(AppTheme.primaryColor),
-                            ),
-                          )
-                        : Text(
-                            '\$${_todaySales.toStringAsFixed(2)}',
-                            style: const TextStyle(
-                              fontSize: 24,
-                              fontWeight: FontWeight.bold,
-                              color: AppTheme.primaryColor,
-                            ),
-                          ),
-                  ],
-                ),
-              ),
-            ),
-          ),
-          const SizedBox(width: 16),
-          Expanded(
-            child: Card(
-              color: AppTheme.cardBackground,
-              elevation: 2,
-              child: Padding(
-                padding: const EdgeInsets.all(16.0),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text(
-                      'Ventas del Mes',
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    _isLoading
-                        ? const SizedBox(
-                            height: 24,
-                            width: 24,
-                            child: CircularProgressIndicator(
-                              strokeWidth: 2,
-                              valueColor: AlwaysStoppedAnimation<Color>(AppTheme.primaryColor),
-                            ),
-                          )
-                        : Text(
-                            '\$${_monthlySales.toStringAsFixed(2)}',
-                            style: const TextStyle(
-                              fontSize: 24,
-                              fontWeight: FontWeight.bold,
-                              color: AppTheme.primaryColor,
-                            ),
-                          ),
-                  ],
-                ),
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
+  // Widget _buildSalesInfo() {
+  //   return Padding(
+  //     padding: const EdgeInsets.all(16.0),
+  //     child: Row(
+  //       children: [
+  //         Expanded(
+  //           child: Card(
+  //             color: AppTheme.cardBackground,
+  //             elevation: 2,
+  //             child: Padding(
+  //               padding: const EdgeInsets.all(16.0),
+  //               child: Column(
+  //                 crossAxisAlignment: CrossAxisAlignment.start,
+  //                 children: [
+  //                   const Text(
+  //                     'Ventas del Día',
+  //                     style: TextStyle(
+  //                       fontSize: 16,
+  //                       fontWeight: FontWeight.bold,
+  //                     ),
+  //                   ),
+  //                   const SizedBox(height: 8),
+  //                   _isLoading
+  //                       ? const SizedBox(
+  //                           height: 24,
+  //                           width: 24,
+  //                           child: CircularProgressIndicator(
+  //                             strokeWidth: 2,
+  //                             valueColor: AlwaysStoppedAnimation<Color>(AppTheme.primaryColor),
+  //                           ),
+  //                         )
+  //                       : Text(
+  //                           '\$${_todaySales.toStringAsFixed(2)}',
+  //                           style: const TextStyle(
+  //                             fontSize: 24,
+  //                             fontWeight: FontWeight.bold,
+  //                             color: AppTheme.primaryColor,
+  //                           ),
+  //                         ),
+  //                 ],
+  //               ),
+  //             ),
+  //           ),
+  //         ),
+  //         const SizedBox(width: 16),
+  //         // Expanded(
+  //         //   child: Card(
+  //         //     color: AppTheme.cardBackground,
+  //         //     elevation: 2,
+  //         //     child: Padding(
+  //         //       padding: const EdgeInsets.all(16.0),
+  //         //       child: Column(
+  //         //         crossAxisAlignment: CrossAxisAlignment.start,
+  //         //         children: [
+  //         //           const Text(
+  //         //             'Ventas del Mes',
+  //         //             style: TextStyle(
+  //         //               fontSize: 16,
+  //         //               fontWeight: FontWeight.bold,
+  //         //             ),
+  //         //           ),
+  //         //           const SizedBox(height: 8),
+  //         //           _isLoading
+  //         //               ? const SizedBox(
+  //         //                   height: 24,
+  //         //                   width: 24,
+  //         //                   child: CircularProgressIndicator(
+  //         //                     strokeWidth: 2,
+  //         //                     valueColor: AlwaysStoppedAnimation<Color>(AppTheme.primaryColor),
+  //         //                   ),
+  //         //                 )
+  //         //               : Text(
+  //         //                   '\$${_monthlySales.toStringAsFixed(2)}',
+  //         //                   style: const TextStyle(
+  //         //                     fontSize: 24,
+  //         //                     fontWeight: FontWeight.bold,
+  //         //                     color: AppTheme.primaryColor,
+  //         //                   ),
+  //         //                 ),
+  //         //         ],
+  //         //       ),
+  //         //     ),
+  //         //   ),
+  //         // ),
+  //       ],
+  //     ),
+  //   );
+  // }
 
   @override
   void dispose() {

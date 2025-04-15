@@ -5,6 +5,7 @@ import 'package:ehstore_app/services/customer_service.dart';
 import 'package:ehstore_app/models/customer.dart';
 import 'package:ehstore_app/theme/app_theme.dart';
 import 'sale_detail_screen.dart';
+import 'new_sale_screen.dart';
 import 'package:intl/intl.dart';
 
 class SaleListScreen extends StatefulWidget {
@@ -75,6 +76,7 @@ class _SaleListScreenState extends State<SaleListScreen> {
     }
   }
   
+  
   // Precarga información de clientes para mostrar nombres
   Future<void> _preloadCustomers() async {
     try {
@@ -140,6 +142,7 @@ class _SaleListScreenState extends State<SaleListScreen> {
     await _loadSales();
   }
   
+
   @override
   Widget build(BuildContext context) {
     return Column(
@@ -241,6 +244,28 @@ class _SaleListScreenState extends State<SaleListScreen> {
                         },
                       ),
                     ),
+        ),
+
+                // Botón flotante para agregar producto
+        Positioned(
+          bottom: 16,
+          right: 16,
+          child: FloatingActionButton(
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => const NewSaleScreen(),
+                ),
+              ).then((result) {
+                if (result == true) {
+                  _refreshSales();
+                }
+              });
+            },
+            backgroundColor: AppTheme.primaryColor,
+            child: const Icon(Icons.add, color: Colors.white),
+          ),
         ),
       ],
     );

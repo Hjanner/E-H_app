@@ -45,7 +45,7 @@ class _MoreScreenState extends State<MoreScreen> {
               context,
               title: 'Categorías',
               icon: Icons.category,
-              color: Colors.green.shade700,
+              color: Colors.purple.shade700,
               onTap: () => Navigator.push(
                 context,
                 MaterialPageRoute(
@@ -57,7 +57,7 @@ class _MoreScreenState extends State<MoreScreen> {
               context,
               title: 'Proveedores',
               icon: Icons.business,
-              color: Colors.orange.shade700,
+              color: Colors.red.shade700,
               onTap: () => Navigator.push(
                 context,
                 MaterialPageRoute(
@@ -68,19 +68,15 @@ class _MoreScreenState extends State<MoreScreen> {
             _buildMenuOption(
               context,
               title: 'Tasa de Cambio',
-              subtitle: '${Product.exchangeRate.toStringAsFixed(2)} Bs/\$',
               icon: Icons.currency_exchange,
-              color: Colors.purple.shade700,
+              color: Colors.yellow.shade700,
               onTap: () async {
-                final result = await Navigator.push(
+                Navigator.push(
                   context,
                   MaterialPageRoute(
                     builder: (context) => const ExchangeRateScreen(),
                   ),
                 );
-                if (result == true) {
-                  setState(() {}); // Actualizar para mostrar la nueva tasa
-                }
               },
             ),
             _buildMenuOption(
