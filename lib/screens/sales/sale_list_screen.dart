@@ -76,7 +76,6 @@ class _SaleListScreenState extends State<SaleListScreen> {
     }
   }
   
-  
   // Precarga información de clientes para mostrar nombres
   Future<void> _preloadCustomers() async {
     try {
@@ -142,132 +141,129 @@ class _SaleListScreenState extends State<SaleListScreen> {
     await _loadSales();
   }
   
-
   @override
   Widget build(BuildContext context) {
-    return Column(
-      children: [
-        Padding(
-          padding: const EdgeInsets.all(16.0),
-          child: TextField(
-            controller: _searchController,
-            decoration: InputDecoration(
-              hintText: 'Buscar ventas...',
-              prefixIcon: const Icon(Icons.search, color: AppTheme.primaryColor),
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(10),
+    return Scaffold(
+      body: Column(
+        children: [
+          Padding(
+            padding: const EdgeInsets.all(16.0),
+            child: TextField(
+              controller: _searchController,
+              decoration: InputDecoration(
+                hintText: 'Buscar ventas...',
+                prefixIcon: const Icon(Icons.search, color: AppTheme.primaryColor),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                contentPadding: const EdgeInsets.symmetric(vertical: 0, horizontal: 16),
               ),
-              contentPadding: const EdgeInsets.symmetric(vertical: 0, horizontal: 16),
+              onChanged: _onSearchChanged,
             ),
-            onChanged: _onSearchChanged,
           ),
-        ),
-        Expanded(
-          child: _isLoading
-              ? const Center(
-                  child: CircularProgressIndicator(
-                    valueColor: AlwaysStoppedAnimation<Color>(AppTheme.primaryColor),
-                  ),
-                )
-              : _filteredSales.isEmpty
-                  ? const Center(
-                      child: Text(
-                        'No se encontraron ventas',
-                        style: TextStyle(
-                          fontSize: 16,
-                          color: Colors.grey,
+          Expanded(
+            child: _isLoading
+                ? const Center(
+                    child: CircularProgressIndicator(
+                      valueColor: AlwaysStoppedAnimation<Color>(AppTheme.primaryColor),
+                    ),
+                  )
+                : _filteredSales.isEmpty
+                    ? const Center(
+                        child: Text(
+                          'No se encontraron ventas',
+                          style: TextStyle(
+                            fontSize: 16,
+                            color: Colors.grey,
+                          ),
+                        ),
+                      )
+                    : RefreshIndicator(
+                        onRefresh: _refreshSales,
+                        color: AppTheme.primaryColor,
+                        child: ListView.builder(
+                          padding: const EdgeInsets.symmetric(horizontal: 16),
+                          itemCount: _filteredSales.length,
+                          itemBuilder: (context, index) {
+                            final sale = _filteredSales[index];
+                            final customer = _customersCache[sale.customerId];
+                            final customerName = customer != null 
+                                ? '${customer.firstName} ${customer.lastName}'
+                                : 'Cliente #${sale.customerId}';
+                            
+                            return Card(
+                              color: AppTheme.cardBackground,
+                              elevation: 2,
+                              margin: const EdgeInsets.only(bottom: 12),
+                              child: ListTile(
+                                leading: _buildStatusIcon(sale.status),
+                                title: Text(
+                                  'Venta #${sale.id.substring(0, 8)}',
+                                  style: const TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                                subtitle: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text('Cliente: $customerName'),
+                                    Text('Fecha: ${DateFormat('dd/MM/yyyy HH:mm').format(sale.createdAt)}'),
+                                    if (sale.status == SaleStatus.credit)
+                                      Text(
+                                        'Deuda: \$${(sale.total - sale.totalPaid).toStringAsFixed(2)}',
+                                        style: const TextStyle(
+                                          color: Colors.red,
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                      ),
+                                  ],
+                                ),
+                                trailing: Text(
+                                  '\$${sale.total.toStringAsFixed(2)}',
+                                  style: const TextStyle(
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                                onTap: () {
+                                  Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (context) => SaleDetailScreen(saleId: sale.id),
+                                    ),
+                                  ).then((_) => _refreshSales());
+                                },
+                                contentPadding: const EdgeInsets.symmetric(
+                                  horizontal: 16,
+                                  vertical: 8,
+                                ),
+                                isThreeLine: true,
+                              ),
+                            );
+                          },
                         ),
                       ),
-                    )
-                  : RefreshIndicator(
-                      onRefresh: _refreshSales,
-                      color: AppTheme.primaryColor,
-                      child: ListView.builder(
-                        padding: const EdgeInsets.symmetric(horizontal: 16),
-                        itemCount: _filteredSales.length,
-                        itemBuilder: (context, index) {
-                          final sale = _filteredSales[index];
-                          final customer = _customersCache[sale.customerId];
-                          final customerName = customer != null 
-                              ? '${customer.firstName} ${customer.lastName}'
-                              : 'Cliente #${sale.customerId}';
-                          
-                          return Card(
-                            color: AppTheme.cardBackground,
-                            elevation: 2,
-                            margin: const EdgeInsets.only(bottom: 12),
-                            child: ListTile(
-                              leading: _buildStatusIcon(sale.status),
-                              title: Text(
-                                'Venta #${sale.id.substring(0, 8)}',
-                                style: const TextStyle(
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                              subtitle: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text('Cliente: $customerName'),
-                                  Text('Fecha: ${DateFormat('dd/MM/yyyy HH:mm').format(sale.createdAt)}'),
-                                  if (sale.status == SaleStatus.credit)
-                                    Text(
-                                      'Deuda: \$${(sale.total - sale.totalPaid).toStringAsFixed(2)}',
-                                      style: const TextStyle(
-                                        color: Colors.red,
-                                        fontWeight: FontWeight.bold,
-                                      ),
-                                    ),
-                                ],
-                              ),
-                              trailing: Text(
-                                '\$${sale.total.toStringAsFixed(2)}',
-                                style: const TextStyle(
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                              onTap: () {
-                                Navigator.push(
-                                  context,
-                                  MaterialPageRoute(
-                                    builder: (context) => SaleDetailScreen(saleId: sale.id),
-                                  ),
-                                ).then((_) => _refreshSales());
-                              },
-                              contentPadding: const EdgeInsets.symmetric(
-                                horizontal: 16,
-                                vertical: 8,
-                              ),
-                              isThreeLine: true,
-                            ),
-                          );
-                        },
-                      ),
-                    ),
-        ),
+          ),      
+        ],
+      ),
 
-                // Botón flotante para agregar producto
-        Positioned(
-          bottom: 16,
-          right: 16,
-          child: FloatingActionButton(
-            onPressed: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => const NewSaleScreen(),
-                ),
-              ).then((result) {
-                if (result == true) {
-                  _refreshSales();
-                }
-              });
-            },
-            backgroundColor: AppTheme.primaryColor,
-            child: const Icon(Icons.add, color: Colors.white),
-          ),
-        ),
-      ],
+      // Botón flotante para agregar producto
+      floatingActionButton: FloatingActionButton(
+        onPressed: () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => const NewSaleScreen(),
+            ),
+          ).then((result) {
+            if (result == true) {
+              _refreshSales();
+            }
+          });
+        },
+        backgroundColor: AppTheme.primaryColor,
+        child: const Icon(Icons.add_shopping_cart, color: Colors.white),
+      ), 
     );
   }
   
