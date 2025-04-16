@@ -7,7 +7,7 @@ import 'package:ehstore_app/theme/app_theme.dart';
 import 'sale_detail_screen.dart';
 import 'new_sale_screen.dart';
 import 'package:intl/intl.dart';
-import 'sales_screen.dart';
+import 'date_filter_utils.dart';
 
 class SaleListScreen extends StatefulWidget {
   final DateFilterOption? initialFilter;
@@ -35,6 +35,7 @@ class SaleListScreenState extends State<SaleListScreen> {
   Map<String, Customer> _customersCache = {};
   bool _isLoading = true;
   String _searchQuery = '';
+  double _totalSales = 0.0;
   
   DateFilterOption _currentFilter = DateFilterOption.today;
   DateTime? _startDate;
@@ -97,10 +98,17 @@ class SaleListScreenState extends State<SaleListScreen> {
           break;
       }
       
+      // Calcular total de ventas
+      double total = 0;
+      for (var sale in sales) {
+        total += sale.total;
+      }
+      
       if (mounted) {
         setState(() {
           _sales = sales;
           _filteredSales = sales;
+          _totalSales = total;
           _isLoading = false;
         });
         
@@ -197,26 +205,182 @@ class SaleListScreenState extends State<SaleListScreen> {
     await _loadSales();
   }
   
+  // Mostrar menú de filtros de fecha
+  void _showFilterMenu(BuildContext context) {
+    final RenderBox button = context.findRenderObject() as RenderBox;
+    final RenderBox overlay = Overlay.of(context).context.findRenderObject() as RenderBox;
+    final RelativeRect position = RelativeRect.fromRect(
+      Rect.fromPoints(
+        button.localToGlobal(Offset.zero, ancestor: overlay),
+        button.localToGlobal(button.size.bottomRight(Offset.zero), ancestor: overlay),
+      ),
+      Offset.zero & overlay.size,
+    );
+
+    showMenu<DateFilterOption>(
+      context: context,
+      position: position,
+      items: [
+        const PopupMenuItem<DateFilterOption>(
+          value: DateFilterOption.today,
+          child: Text('Hoy'),
+        ),
+        const PopupMenuItem<DateFilterOption>(
+          value: DateFilterOption.thisWeek,
+          child: Text('Esta semana'),
+        ),
+        const PopupMenuItem<DateFilterOption>(
+          value: DateFilterOption.thisMonth,
+          child: Text('Este mes'),
+        ),
+        const PopupMenuItem<DateFilterOption>(
+          value: DateFilterOption.custom,
+          child: Text('Rango personalizado'),
+        ),
+      ],
+    ).then((DateFilterOption? value) {
+      if (value != null) {
+        if (value == DateFilterOption.custom) {
+          _showDateRangePicker();
+        } else {
+          setState(() {
+            _currentFilter = value;
+            _startDate = null;
+            _endDate = null;
+          });
+          _loadSalesWithFilter();
+        }
+      }
+    });
+  }
+  
+  // Mostrar selector de rango de fechas
+  Future<void> _showDateRangePicker() async {
+    final DateTimeRange? dateRange = await DateFilterUtils.showDateRangePickerDialog(
+      context, 
+      _startDate, 
+      _endDate
+    );
+
+    if (dateRange != null) {
+      setState(() {
+        _currentFilter = DateFilterOption.custom;
+        _startDate = dateRange.start;
+        _endDate = dateRange.end;
+      });
+      _loadSalesWithFilter();
+    }
+  }
+  
+  // Construir tarjeta con información de ventas
+  Widget _buildSalesInfoCard() {
+    return Card(
+      color: AppTheme.cardBackground,
+      elevation: 2,
+      margin: const EdgeInsets.only(left: 16, right: 16, bottom: 16),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Expanded(
+                  child: Text(
+                    DateFilterUtils.buildFilterTitle(_currentFilter, _startDate, _endDate),
+                    style: const TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+                if (_currentFilter == DateFilterOption.custom && (_startDate == null || _endDate == null))
+                  TextButton.icon(
+                    icon: const Icon(Icons.calendar_today, size: 16),
+                    label: const Text('Seleccionar fechas'),
+                    onPressed: _showDateRangePicker,
+                    style: TextButton.styleFrom(
+                      foregroundColor: AppTheme.primaryColor,
+                      padding: const EdgeInsets.symmetric(horizontal: 8),
+                    ),
+                  ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            DateFilterUtils.buildSalesTotalsWidget(_totalSales, _isLoading),
+          ],
+        ),
+      ),
+    );
+  }
+  
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       body: Column(
         children: [
+
+          const SizedBox(height: 18,),
+          // Tarjeta de información de ventas
+          _buildSalesInfoCard(),
+
+          //filtros
           Padding(
-            padding: const EdgeInsets.all(16.0),
-            child: TextField(
-              controller: _searchController,
-              decoration: InputDecoration(
-                hintText: 'Buscar ventas...',
-                prefixIcon: const Icon(Icons.search, color: AppTheme.primaryColor),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(10),
+            padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 6),
+            child: Row(
+              children: [            
+                // Campo de búsqueda
+                Expanded(
+                  child: TextField(
+                    controller: _searchController,
+                    decoration: InputDecoration(
+                      hintText: 'Buscar ventas...',
+                      prefixIcon: const Icon(Icons.search, color: AppTheme.primaryColor),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      contentPadding: const EdgeInsets.symmetric(vertical: 0, horizontal: 16),
+                    ),
+                    onChanged: _onSearchChanged,
+                  ),
                 ),
-                contentPadding: const EdgeInsets.symmetric(vertical: 0, horizontal: 16),
-              ),
-              onChanged: _onSearchChanged,
+
+                const SizedBox(width: 8),
+
+                // Botón de filtro
+                Container(
+                  height: 48,
+                  margin: const EdgeInsets.only(right: 8),
+                  decoration: BoxDecoration(
+                    border: Border.all(color: Colors.grey.shade400),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Builder(
+                    builder: (context) => InkWell(
+                      onTap: () => _showFilterMenu(context),
+                      borderRadius: BorderRadius.circular(9),
+                      child: const Padding(
+                        padding: EdgeInsets.symmetric(horizontal: 12),
+                        child: Row(
+                          children: [
+                            Icon(Icons.filter_list, color: AppTheme.primaryColor),
+                            SizedBox(width: 4),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+               
+              ],
             ),
           ),
+ 
+        //informacion ventas
           Expanded(
             child: _isLoading
                 ? const Center(
@@ -263,7 +427,7 @@ class SaleListScreenState extends State<SaleListScreen> {
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
                                     Text('Cliente: $customerName'),
-                                    Text('Fecha: ${DateFormat('dd/MM/yyyy HH:mm').format(sale.createdAt)}'),
+                                    Text('${DateFormat('dd/MM/yy hh:mma').format(sale.createdAt)}'),
                                     if (sale.status == SaleStatus.credit)
                                       Text(
                                         'Deuda: \$${(sale.total - sale.totalPaid).toStringAsFixed(2)}',
@@ -315,7 +479,7 @@ class SaleListScreenState extends State<SaleListScreen> {
         },
         backgroundColor: AppTheme.primaryColor,
         child: const Icon(Icons.add_shopping_cart, color: Colors.white,),
-      ),
+      ), 
     );
   }
   

@@ -406,12 +406,12 @@ class _DebtDetailScreenState extends State<DebtDetailScreen> {
                 Column(
                   crossAxisAlignment: CrossAxisAlignment.end,
                   children: [
-                    Text(
-                      '\$${_debt!.totalAmount.toStringAsFixed(2)}',
-                      style: const TextStyle(
-                        fontWeight: FontWeight.bold,
-                        fontSize: 16,
-                      ),
+                Text(
+                  '\$${_debt!.totalAmount.toStringAsFixed(2)}',
+                  style: const TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 16,
+                  ),
                     ),
                     Text(
                       'Bs. ${(_debt!.totalAmount * Product.exchangeRate).toStringAsFixed(2)}',
@@ -437,13 +437,13 @@ class _DebtDetailScreenState extends State<DebtDetailScreen> {
                 Column(
                   crossAxisAlignment: CrossAxisAlignment.end,
                   children: [
-                    Text(
-                      '\$${_debt!.paidAmount.toStringAsFixed(2)}',
-                      style: TextStyle(
-                        fontWeight: FontWeight.bold,
-                        fontSize: 16,
-                        color: _debt!.paidAmount > 0 ? Colors.green : Colors.grey,
-                      ),
+                Text(
+                  '\$${_debt!.paidAmount.toStringAsFixed(2)}',
+                  style: TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 16,
+                    color: _debt!.paidAmount > 0 ? Colors.green : Colors.grey,
+                  ),
                     ),
                     Text(
                       'Bs. ${(_debt!.paidAmount * Product.exchangeRate).toStringAsFixed(2)}',
@@ -471,13 +471,13 @@ class _DebtDetailScreenState extends State<DebtDetailScreen> {
                     Column(
                       crossAxisAlignment: CrossAxisAlignment.end,
                       children: [
-                        Text(
-                          '\$${_debt!.pendingAmount.toStringAsFixed(2)}',
-                          style: const TextStyle(
-                            fontWeight: FontWeight.bold,
-                            fontSize: 18,
-                            color: Colors.red,
-                          ),
+                    Text(
+                      '\$${_debt!.pendingAmount.toStringAsFixed(2)}',
+                      style: const TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 18,
+                        color: Colors.red,
+                      ),
                         ),
                         Text(
                           'Bs. ${(_debt!.pendingAmount * Product.exchangeRate).toStringAsFixed(2)}',
@@ -612,9 +612,9 @@ class _DebtDetailScreenState extends State<DebtDetailScreen> {
                             style: const TextStyle(fontWeight: FontWeight.bold),
                           )
                         else
-                          Text(
-                            '\$${payment.amount.toStringAsFixed(2)}',
-                            style: const TextStyle(fontWeight: FontWeight.bold),
+                    Text(
+                      '\$${payment.amount.toStringAsFixed(2)}',
+                      style: const TextStyle(fontWeight: FontWeight.bold),
                           ),
                         
                         // Mostramos el equivalente en la otra moneda
@@ -815,4 +815,4 @@ class _DebtDetailScreenState extends State<DebtDetailScreen> {
         return 'A Crédito';
     }
   }
-}
+} 
