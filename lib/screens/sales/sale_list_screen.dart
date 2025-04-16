@@ -7,15 +7,25 @@ import 'package:ehstore_app/theme/app_theme.dart';
 import 'sale_detail_screen.dart';
 import 'new_sale_screen.dart';
 import 'package:intl/intl.dart';
+import 'sales_screen.dart';
 
 class SaleListScreen extends StatefulWidget {
-  const SaleListScreen({super.key});
+  final DateFilterOption? initialFilter;
+  final DateTime? startDate;
+  final DateTime? endDate;
+
+  const SaleListScreen({
+    Key? key,
+    this.initialFilter,
+    this.startDate,
+    this.endDate,
+  }) : super(key: key);
 
   @override
-  State<SaleListScreen> createState() => _SaleListScreenState();
+  SaleListScreenState createState() => SaleListScreenState();
 }
 
-class _SaleListScreenState extends State<SaleListScreen> {
+class SaleListScreenState extends State<SaleListScreen> {
   final SaleService _saleService = SaleService();
   final CustomerService _customerService = CustomerService();
   final TextEditingController _searchController = TextEditingController();
@@ -26,9 +36,17 @@ class _SaleListScreenState extends State<SaleListScreen> {
   bool _isLoading = true;
   String _searchQuery = '';
   
+  DateFilterOption _currentFilter = DateFilterOption.today;
+  DateTime? _startDate;
+  DateTime? _endDate;
+  
   @override
   void initState() {
     super.initState();
+    // Inicializar filtros desde los parámetros
+    _currentFilter = widget.initialFilter ?? DateFilterOption.today;
+    _startDate = widget.startDate;
+    _endDate = widget.endDate;
     _loadSales();
   }
   
@@ -38,13 +56,46 @@ class _SaleListScreenState extends State<SaleListScreen> {
     super.dispose();
   }
   
-  Future<void> _loadSales() async {
+  // Método público para recargar ventas con filtros nuevos
+  void reloadSales(DateFilterOption filter, DateTime? startDate, DateTime? endDate) {
+    setState(() {
+      _currentFilter = filter;
+      _startDate = startDate;
+      _endDate = endDate;
+    });
+    _loadSalesWithFilter();
+  }
+  
+  Future<void> _loadSalesWithFilter() async {
     setState(() {
       _isLoading = true;
     });
     
     try {
-      final sales = await _saleService.getAllSales();
+      List<Sale> sales = [];
+      
+      // Cargar ventas según el filtro seleccionado
+      switch (_currentFilter) {
+        case DateFilterOption.today:
+          sales = await _saleService.getSalesOfDay();
+          break;
+          
+        case DateFilterOption.thisWeek:
+          sales = await _saleService.getSalesOfWeek();
+          break;
+          
+        case DateFilterOption.thisMonth:
+          sales = await _saleService.getSalesOfMonth();
+          break;
+          
+        case DateFilterOption.custom:
+          if (_startDate != null && _endDate != null) {
+            sales = await _saleService.getSalesByDateRange(_startDate!, _endDate!);
+          } else {
+            sales = await _saleService.getAllSales();
+          }
+          break;
+      }
       
       if (mounted) {
         setState(() {
@@ -74,6 +125,11 @@ class _SaleListScreenState extends State<SaleListScreen> {
         );
       }
     }
+  }
+  
+  Future<void> _loadSales() async {
+    // Simplemente llamar al método que maneja los filtros
+    await _loadSalesWithFilter();
   }
   
   // Precarga información de clientes para mostrar nombres
@@ -255,15 +311,11 @@ class _SaleListScreenState extends State<SaleListScreen> {
             MaterialPageRoute(
               builder: (context) => const NewSaleScreen(),
             ),
-          ).then((result) {
-            if (result == true) {
-              _refreshSales();
-            }
-          });
+          ).then((_) => _refreshSales());
         },
         backgroundColor: AppTheme.primaryColor,
-        child: const Icon(Icons.add_shopping_cart, color: Colors.white),
-      ), 
+        child: const Icon(Icons.add_shopping_cart, color: Colors.white,),
+      ),
     );
   }
   
@@ -292,7 +344,7 @@ class _SaleListScreenState extends State<SaleListScreen> {
     
     return CircleAvatar(
       backgroundColor: color.withOpacity(0.1),
-      child: Icon(icon, color: color),
+      child: Icon(icon, color: color, size: 20),
     );
   }
 } 

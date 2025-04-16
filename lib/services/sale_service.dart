@@ -578,57 +578,36 @@ class SaleService {
       return [];
     }
     
-    List<Sale> sales = [];
-    for (var saleMap in saleMaps) {
-      final String saleId = saleMap['id'];
-      
-      // Obtener items de la venta
-      final List<Map<String, dynamic>> itemMaps = await db.query(
-        'sale_items',
-        where: 'sale_id = ?',
-        whereArgs: [saleId],
-      );
-      
-      List<SaleItem> items = itemMaps.map((itemMap) => SaleItem(
-        productId: itemMap['product_id'],
-        productName: itemMap['product_name'],
-        price: itemMap['price'],
-        priceInBs: itemMap['price_in_bs'],
-        quantity: itemMap['quantity'],
-        subtotal: itemMap['subtotal'],
-        subtotalInBs: itemMap['subtotal_in_bs'],
-      )).toList();
-      
-      // Obtener pagos de la venta
-      final List<Map<String, dynamic>> paymentMaps = await db.query(
-        'payments',
-        where: 'sale_id = ?',
-        whereArgs: [saleId],
-      );
-      
-      List<Payment> payments = paymentMaps.map((paymentMap) => Payment(
-        id: paymentMap['id'],
-        method: PaymentMethod.values.byName(paymentMap['method']),
-        amount: paymentMap['amount'],
-        referenceNumber: paymentMap['reference_number'],
-        date: DateTime.parse(paymentMap['date']),
-      )).toList();
-
-      // Crear objeto Sale
-      sales.add(Sale(
-        id: saleId,
-        customerId: saleMap['customer_id'],
-        items: items,
-        payments: payments,
-        total: saleMap['total'],
-        totalPaid: saleMap['total_paid'],
-        status: SaleStatus.values.byName(saleMap['status']),
-        notes: saleMap['notes'],
-        createdAt: DateTime.parse(saleMap['created_at']),
-        updatedAt: DateTime.parse(saleMap['updated_at']),
-      ));
+    // Crear lista de ventas (mismo código de mapeo)
+    List<Sale> sales = await _mapSalesFromDb(saleMaps);
+    return sales;
+  }
+  
+  // Obtener ventas de la semana actual
+  Future<List<Sale>> getSalesOfWeek() async {
+    final db = await _databaseService.database;
+    final now = DateTime.now();
+    
+    // Determinar el inicio de la semana (lunes)
+    final firstDayOfWeek = now.subtract(Duration(days: now.weekday - 1));
+    final startOfWeek = DateTime(firstDayOfWeek.year, firstDayOfWeek.month, firstDayOfWeek.day).toIso8601String();
+    
+    // Determinar el fin de la semana (domingo)
+    final lastDayOfWeek = firstDayOfWeek.add(const Duration(days: 7));
+    final endOfWeek = DateTime(lastDayOfWeek.year, lastDayOfWeek.month, lastDayOfWeek.day).toIso8601String();
+    
+    final List<Map<String, dynamic>> saleMaps = await db.query(
+      'sales',
+      where: 'created_at >= ? AND created_at < ?',
+      whereArgs: [startOfWeek, endOfWeek],
+    );
+    
+    if (saleMaps.isEmpty) {
+      return [];
     }
     
+    // Crear lista de ventas
+    List<Sale> sales = await _mapSalesFromDb(saleMaps);
     return sales;
   }
   
@@ -649,7 +628,40 @@ class SaleService {
       return [];
     }
     
+    // Crear lista de ventas
+    List<Sale> sales = await _mapSalesFromDb(saleMaps);
+    return sales;
+  }
+  
+  // Obtener ventas por rango de fechas
+  Future<List<Sale>> getSalesByDateRange(DateTime startDate, DateTime endDate) async {
+    final db = await _databaseService.database;
+    
+    // Normalizar las fechas para asegurar que cubran días completos
+    final start = DateTime(startDate.year, startDate.month, startDate.day).toIso8601String();
+    // Añadir un día a la fecha final para incluir todo el último día
+    final end = DateTime(endDate.year, endDate.month, endDate.day + 1).toIso8601String();
+    
+    final List<Map<String, dynamic>> saleMaps = await db.query(
+      'sales',
+      where: 'created_at >= ? AND created_at < ?',
+      whereArgs: [start, end],
+    );
+    
+    if (saleMaps.isEmpty) {
+      return [];
+    }
+    
+    // Crear lista de ventas
+    List<Sale> sales = await _mapSalesFromDb(saleMaps);
+    return sales;
+  }
+  
+  // Método auxiliar para mapear resultados de DB a objetos Sale
+  Future<List<Sale>> _mapSalesFromDb(List<Map<String, dynamic>> saleMaps) async {
+    final db = await _databaseService.database;
     List<Sale> sales = [];
+    
     for (var saleMap in saleMaps) {
       final String saleId = saleMap['id'];
       
