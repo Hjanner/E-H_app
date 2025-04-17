@@ -428,7 +428,7 @@ class SaleListScreenState extends State<SaleListScreen> {
                                 subtitle: Column(
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
-                                    Text('Cliente: $customerName'),
+                                    Text('$customerName'),
                                     Text('${DateFormat('dd/MM/yy hh:mma').format(sale.createdAt)}'),
                                     if (sale.status == SaleStatus.credit)
                                       Text(

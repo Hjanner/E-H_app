@@ -9,6 +9,10 @@ import 'package:ehstore_app/screens/more/customers/customer_detail_screen.dart';
 import 'package:ehstore_app/screens/inventory/product_detail_screen.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:intl/intl.dart';
+import 'package:ehstore_app/widgets/customer_info_card.dart';
+import 'package:ehstore_app/widgets/payment_list_card.dart';
+import 'package:ehstore_app/widgets/product_list_card.dart';
+import 'package:ehstore_app/widgets/section_title.dart';
 
 class SaleDetailScreen extends StatefulWidget {
   final String saleId;
@@ -157,6 +161,15 @@ class _SaleDetailScreenState extends State<SaleDetailScreen> {
     );
   }
 
+  void _handleRegisterPayment() {
+    // TODO: Implementar pantalla para registrar pago de deuda
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Función de registrar pago no implementada aún'),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -204,11 +217,26 @@ class _SaleDetailScreenState extends State<SaleDetailScreen> {
                         children: [
                           _buildSaleHeader(),
                           const SizedBox(height: 24),
-                          _buildCustomerInfo(),
+                          CustomerInfoCard(
+                            customer: _customer,
+                            customerId: _sale!.customerId,
+                            showContactButtons: false,
+                          ),
                           const SizedBox(height: 24),
-                          _buildProductsList(),
+                          ProductListCard(
+                            items: _sale!.items,
+                            total: _sale!.total,
+                            onProductTap: _navigateToProductDetails,
+                          ),
                           const SizedBox(height: 24),
-                          _buildPaymentInfo(),
+                          PaymentListCard(
+                            payments: _sale!.payments,
+                            totalAmount: _sale!.total,
+                            totalPaid: _sale!.totalPaid,
+                            pendingAmount: _sale!.pendingBalance,
+                            hasPendingBalance: _sale!.hasPendingBalance,
+                            onRegisterPayment: _sale!.status == SaleStatus.credit ? _handleRegisterPayment : null,
+                          ),
                           if (_sale!.status == SaleStatus.credit)
                             Padding(
                               padding: const EdgeInsets.only(top: 24),
@@ -260,9 +288,9 @@ class _SaleDetailScreenState extends State<SaleDetailScreen> {
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                const Text(
-                  'Venta ',
-                  style: TextStyle(
+                Text(
+                  'Venta #${_sale!.id.substring(0, 8)}',
+                  style: const TextStyle(
                     fontSize: 20,
                     fontWeight: FontWeight.bold,
                   ),
@@ -289,7 +317,7 @@ class _SaleDetailScreenState extends State<SaleDetailScreen> {
                 Icon(Icons.calendar_today, size: 16, color: Colors.grey[600]),
                 const SizedBox(width: 8),
                 Text(
-                  'Fecha: ${DateFormat('dd/MM/yy hh:mm a').format(_sale!.createdAt)}',
+                  'Fecha: ${DateFormat('dd/MM/yyyy HH:mm').format(_sale!.createdAt)}',
                   style: TextStyle(color: Colors.grey[700]),
                 ),
               ],
@@ -319,445 +347,6 @@ class _SaleDetailScreenState extends State<SaleDetailScreen> {
                   ],
                 ),
               ],
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-  
-  Widget _buildCustomerInfo() {
-    return Card(
-      color: AppTheme.cardBackground,
-      elevation: 0,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: InkWell(
-        onTap: _customer != null ? _navigateToCustomerDetails : null,
-        borderRadius: BorderRadius.circular(12),
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              _buildSectionTitle('Información del Cliente'),
-              const SizedBox(height: 16),
-              if (_customer != null)
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              _customer!.fullName,
-                              style: const TextStyle(
-                                fontSize: 18,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                          ],
-                        ),
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 12,
-                            vertical: 6,
-                          ),
-                          decoration: BoxDecoration(
-                            color: _customer!.isActive 
-                                ? const Color(0xFFE6F7ED)
-                                : const Color(0xFFFFE9EC),
-                            borderRadius: BorderRadius.circular(16),
-                          ),
-                          child: Text(
-                            _customer!.isActive ? 'Activo' : 'Inactivo',
-                            style: TextStyle(
-                              fontSize: 13,
-                              fontWeight: FontWeight.bold,
-                              color: _customer!.isActive
-                                  ? const Color(0xFF0D9145)
-                                  : const Color(0xFFD93644),
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 16),
-                    Row(
-                      children: [
-                        Container(
-                          padding: const EdgeInsets.all(8),
-                          decoration: BoxDecoration(
-                            color: AppTheme.primaryColor.withOpacity(0.1),
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                          child: const Icon(
-                            Icons.phone_outlined,
-                            color: AppTheme.primaryColor,
-                            size: 20,
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                'Teléfono',
-                                style: TextStyle(
-                                  fontSize: 14,
-                                  color: Colors.grey[600],
-                                ),
-                              ),
-                              Text(
-                                _customer!.phone,
-                                style: const TextStyle(
-                                  fontSize: 16,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                        IconButton(
-                          onPressed: () => _copyToClipboard(
-                            _customer!.phone, 
-                            'Teléfono copiado al portapapeles'
-                          ),
-                          icon: const Icon(Icons.copy, size: 20, color: Colors.grey),
-                          tooltip: 'Copiar teléfono',
-                        ),
-                      ],
-                    ),
-                    // const SizedBox(height: 16),
-                    // Row(
-                    //   mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                    //   children: [
-                    //     ElevatedButton.icon(
-                    //       onPressed: _callCustomer,
-                    //       icon: const Icon(Icons.phone),
-                    //       label: const Text('Llamar'),
-                    //       style: ElevatedButton.styleFrom(
-                    //         backgroundColor: AppTheme.primaryColor,
-                    //         foregroundColor: Colors.white,
-                    //         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                    //       ),
-                    //     ),
-                    //     ElevatedButton.icon(
-                    //       onPressed: _sendWhatsAppMessage,
-                    //       icon: const Icon(Icons.chat_outlined),
-                    //       label: const Text('WhatsApp'),
-                    //       style: ElevatedButton.styleFrom(
-                    //         backgroundColor: const Color(0xFF25D366),
-                    //         foregroundColor: Colors.white,
-                    //         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                    //       ),
-                    //     ),
-                    //   ],
-                    // ),
-                  ],
-                )
-              else
-                Text(
-                  'Cliente ID: ${_sale!.customerId}',
-                  style: const TextStyle(
-                    fontStyle: FontStyle.italic,
-                    color: Colors.grey,
-                  ),
-                ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-  
-  Widget _buildProductsList() {
-    return Card(
-      color: AppTheme.cardBackground,
-      elevation: 0,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            _buildSectionTitle('Productos'),
-            const SizedBox(height: 8),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.end,
-              children: [
-                Text(
-                  '${_sale!.items.length} items',
-                  style: TextStyle(color: Colors.grey[600], fontSize: 14),                  
-                ),
-              ],
-            ),
-            const SizedBox(height: 16),
-            for (var item in _sale!.items) ...[
-              InkWell(
-                onTap: () => _navigateToProductDetails(item.productId),
-                borderRadius: BorderRadius.circular(8),
-                child: Container(
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: Colors.grey[50],
-                    borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: Colors.grey[200]!),
-                  ),
-                  child: Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              item.productName,
-                              style: const TextStyle(
-                                fontWeight: FontWeight.bold,
-                                fontSize: 16,
-                              ),
-                            ),
-                            const SizedBox(height: 4),
-                            Row(
-                              children: [
-                                Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                                  decoration: BoxDecoration(
-                                    color: AppTheme.primaryColor.withOpacity(0.1),
-                                    borderRadius: BorderRadius.circular(4),
-                                  ),
-                                  child: Text(
-                                    '${item.quantity} x \$${item.price.toStringAsFixed(2)}',
-                                    style: const TextStyle(
-                                      color: AppTheme.primaryColor,
-                                      fontWeight: FontWeight.w500,
-                                      fontSize: 14,
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ],
-                        ),
-                      ),
-                      Column(
-                        crossAxisAlignment: CrossAxisAlignment.end,
-                        children: [
-                          Text(
-                            '\$${item.subtotal.toStringAsFixed(2)}',
-                            style: const TextStyle(
-                              fontWeight: FontWeight.bold,
-                              fontSize: 16,
-                            ),
-                          ),
-                          const Text(
-                            'Ver producto',
-                            style: TextStyle(
-                              fontSize: 12,
-                              color: AppTheme.primaryColor,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-              if (item != _sale!.items.last)
-                const SizedBox(height: 12),
-            ],
-            const Divider(height: 32),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                const Text(
-                  'Total',
-                  style: TextStyle(
-                    fontWeight: FontWeight.bold,
-                    fontSize: 18,
-                  ),
-                ),
-                Text(
-                  '\$${_sale!.total.toStringAsFixed(2)}',
-                  style: const TextStyle(
-                    fontWeight: FontWeight.bold,
-                    fontSize: 20,
-                    color: AppTheme.primaryColor,
-                  ),
-                ),
-              ],
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-  
-  Widget _buildPaymentInfo() {
-    return Card(
-      color: AppTheme.cardBackground,
-      elevation: 0,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            _buildSectionTitle('Pagos'),
-            const SizedBox(height: 16),
-            if (_sale!.payments.isEmpty)
-              Container(
-                color: Colors.grey[50],
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: Colors.grey[50],
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: Colors.grey[200]!),
-                ),
-                child: const Center(
-                  child: Text(
-                    'No hay pagos registrados',
-                    style: TextStyle(
-                      fontStyle: FontStyle.italic,
-                      color: Colors.grey,
-                    ),
-                  ),
-                ),
-              )
-            else
-              for (var payment in _sale!.payments) ...[
-                Container(
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: Colors.grey[50],
-                    borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: Colors.grey[200]!),
-                  ),
-                  child: Row(
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.all(8),
-                        decoration: BoxDecoration(
-                          color: AppTheme.primaryColor.withOpacity(0.1),
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        child: Icon(
-                          _getPaymentIcon(payment.method),
-                          color: AppTheme.primaryColor,
-                          size: 20,
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              _getPaymentMethodName(payment.method),
-                              style: const TextStyle(
-                                fontWeight: FontWeight.bold,
-                                fontSize: 16,
-                              ),
-                            ),
-                            Text(
-                              'Fecha: ${DateFormat('dd/MM/yy hh:mm a').format(payment.date)}',
-                              style: TextStyle(
-                                fontSize: 14,
-                                color: Colors.grey[600],
-                              ),
-                            ),
-                            if (payment.referenceNumber != null && payment.referenceNumber!.isNotEmpty)
-                              Text(
-                                'Ref: ${payment.referenceNumber}',
-                                style: TextStyle(
-                                  fontSize: 14,
-                                  color: Colors.grey[600],
-                                ),
-                              ),
-                          ],
-                        ),
-                      ),
-                      if(payment.method.toString() == 'cashUSD')
-                        Text(
-                          '\$${payment.amount.toStringAsFixed(2)}',
-                          style: const TextStyle(
-                            fontWeight: FontWeight.bold,
-                            fontSize: 16,
-                          ),
-                        )
-                      else Text(
-                          '${payment.amount.toStringAsFixed(2)} Bs',
-                          style: const TextStyle(
-                            fontWeight: FontWeight.bold,
-                            fontSize: 16,  
-                          ),                      
-                      )
-                    ],
-                  ),
-                ),
-                if (payment != _sale!.payments.last)
-                  const SizedBox(height: 12),
-              ],
-            const SizedBox(height: 16),
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: _sale!.totalPaid >= _sale!.total
-                    ? Colors.green.withOpacity(0.1)
-                    : Colors.orange.withOpacity(0.1),
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: Column(
-                children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      const Text(
-                        'Total Pagado',
-                        style: TextStyle(fontWeight: FontWeight.bold),
-                      ),
-                      Text(
-                        '\$${_sale!.totalPaid.toStringAsFixed(2)}',
-                        style: TextStyle(
-                          fontWeight: FontWeight.bold,
-                          fontSize: 16,
-                          color: _sale!.totalPaid >= _sale!.total ? Colors.green : Colors.orange,
-                        ),
-                      ),
-                    ],
-                  ),
-                  if (_sale!.hasPendingBalance)
-                    Padding(
-                      padding: const EdgeInsets.only(top: 8),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          const Text(
-                            'Saldo Pendiente',
-                            style: TextStyle(fontWeight: FontWeight.bold),
-                          ),
-                          Text(
-                            '\$${_sale!.pendingBalance.toStringAsFixed(2)}',
-                            style: const TextStyle(
-                              fontWeight: FontWeight.bold,
-                              fontSize: 16,
-                              color: Colors.red,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                ],
-              ),
             ),
           ],
         ),
@@ -823,14 +412,7 @@ class _SaleDetailScreenState extends State<SaleDetailScreen> {
             SizedBox(
               width: double.infinity,
               child: ElevatedButton.icon(
-                onPressed: () {
-                  // TODO: Implementar pantalla para registrar pago de deuda
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text('Función no implementada aún'),
-                    ),
-                  );
-                },
+                onPressed: _handleRegisterPayment,
                 icon: const Icon(Icons.payment),
                 label: const Text('Registrar Pago'),
                 style: ElevatedButton.styleFrom(
@@ -857,7 +439,7 @@ class _SaleDetailScreenState extends State<SaleDetailScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            _buildSectionTitle('Notas'),
+            const SectionTitle(title: 'Notas'),
             const SizedBox(height: 12),
             Container(
               padding: const EdgeInsets.all(12),
@@ -873,62 +455,5 @@ class _SaleDetailScreenState extends State<SaleDetailScreen> {
         ),
       ),
     );
-  }
-  
-  Widget _buildSectionTitle(String title) {
-    return Row(
-      children: [
-        Text(
-          title,
-          style: const TextStyle(
-            fontSize: 18,
-            fontWeight: FontWeight.bold,
-          ),
-        ),
-        const SizedBox(width: 8),
-        Expanded(
-          child: Divider(
-            color: Colors.grey[300],
-            thickness: 1,
-          ),
-        ),
-      ],
-    );
-  }
-  
-  String _getPaymentMethodName(PaymentMethod method) {
-    switch (method) {
-      case PaymentMethod.cashUSD:
-        return 'Efectivo (USD)';
-      case PaymentMethod.cashBs:
-        return 'Efectivo (Bs)';
-      case PaymentMethod.bankTransfer:
-        return 'Transferencia Bancaria';
-      case PaymentMethod.mobilePayment:
-        return 'Pago Móvil';
-      case PaymentMethod.creditCard:
-        return 'Tarjeta de Crédito';
-      case PaymentMethod.debitCard:
-        return 'Tarjeta de Débito';
-      case PaymentMethod.debt:
-        return 'A Crédito';
-    }
-  }
-  
-  IconData _getPaymentIcon(PaymentMethod method) {
-    switch (method) {
-      case PaymentMethod.cashUSD:
-      case PaymentMethod.cashBs:
-        return Icons.payments_outlined;
-      case PaymentMethod.bankTransfer:
-        return Icons.account_balance_outlined;
-      case PaymentMethod.mobilePayment:
-        return Icons.phone_android_outlined;
-      case PaymentMethod.creditCard:
-      case PaymentMethod.debitCard:
-        return Icons.credit_card_outlined;
-      case PaymentMethod.debt:
-        return Icons.access_time;
-    }
   }
 } 
