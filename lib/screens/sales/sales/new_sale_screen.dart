@@ -7,7 +7,7 @@ import 'package:ehstore_app/services/product_service.dart';
 import 'package:ehstore_app/services/customer_service.dart';
 import 'package:ehstore_app/theme/app_theme.dart';
 import 'package:uuid/uuid.dart';
-import 'customer_selector_dialog.dart';
+import '../customer_selector_dialog.dart';
 
 class NewSaleScreen extends StatefulWidget {
   const NewSaleScreen({super.key});

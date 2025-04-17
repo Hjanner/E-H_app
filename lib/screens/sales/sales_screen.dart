@@ -3,9 +3,9 @@ import 'package:ehstore_app/theme/app_theme.dart';
 import 'package:ehstore_app/services/sale_service.dart';
 import 'package:ehstore_app/models/sale.dart';
 import 'package:intl/intl.dart';
-import 'sale_list_screen.dart';
-import 'debt_list_screen.dart';
-import 'date_filter_utils.dart';
+import 'sales/sale_list_screen.dart';
+import 'debit/debt_list_screen.dart';
+import 'debit/date_filter_utils.dart';
 
 class SalesScreen extends StatefulWidget {
   const SalesScreen({super.key});

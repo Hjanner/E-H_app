@@ -7,7 +7,7 @@ import 'package:ehstore_app/theme/app_theme.dart';
 import 'sale_detail_screen.dart';
 import 'new_sale_screen.dart';
 import 'package:intl/intl.dart';
-import 'date_filter_utils.dart';
+import '../debit/date_filter_utils.dart';
 
 class SaleListScreen extends StatefulWidget {
   final DateFilterOption? initialFilter;
@@ -380,6 +380,8 @@ class SaleListScreenState extends State<SaleListScreen> {
             ),
           ),
  
+          const SizedBox(height: 8,),
+
         //informacion ventas
           Expanded(
             child: _isLoading
