@@ -257,6 +257,20 @@ class _CustomerListScreenState extends State<CustomerListScreen> {
             ),
           ),
           
+          Container(   
+            padding: const EdgeInsets.only(left: 20),
+            alignment: Alignment.centerLeft,      
+            child:                       
+              Text(
+              '${_filteredCustomers.length} clientes',
+              style: const TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
+                color: Colors.black87,
+              ),
+            ),
+          ),
+
           // Lista de clientes
           Expanded(
             child: _isLoading

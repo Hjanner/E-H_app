@@ -3,9 +3,9 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 import 'package:ehstore_app/screens/home_screen.dart';
 import 'package:ehstore_app/theme/app_theme.dart';
-import 'package:ehstore_app/screens/customers/customer_list_screen.dart';
-import 'package:ehstore_app/screens/customers/customer_detail_screen.dart';
-import 'package:ehstore_app/screens/customers/customer_form_screen.dart';
+import 'package:ehstore_app/screens/more/customers/customer_list_screen.dart';
+import 'package:ehstore_app/screens/more/customers/customer_detail_screen.dart';
+import 'package:ehstore_app/screens/more/customers/customer_form_screen.dart';
 import 'screens/inventory/products_screen.dart';
 
 void main() {

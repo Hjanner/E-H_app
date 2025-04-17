@@ -32,7 +32,7 @@ class SupplierCard extends StatelessWidget {
         onTap: onTap,
         borderRadius: BorderRadius.circular(15),
         child: Padding(
-          padding: const EdgeInsets.all(16),
+          padding: const EdgeInsets.only(left: 16, right: 16, top: 16, bottom: 10),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -116,7 +116,7 @@ class SupplierCard extends StatelessWidget {
                     color: Colors.grey,
                   ),
                   const SizedBox(width: 8),
-                  Text(
+                Text(
                     supplier.phone,
                     style: const TextStyle(
                       fontSize: 14,
@@ -124,35 +124,31 @@ class SupplierCard extends StatelessWidget {
                     ),
                   ),
                 ],
-              ),
-              
-              const SizedBox(height: 8),
+              ),                          
               
               // Persona de contacto
-              Row(
-                children: [
-                  const Icon(
-                    Icons.person_outline,
-                    size: 16,
-                    color: Colors.grey,
-                  ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      supplier.contactPerson,
-                      style: const TextStyle(
-                        fontSize: 14,
-                        color: Colors.black87,
-                      ),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ),
-                ],
-              ),
-              
-              const SizedBox(height: 10),
-              
+              // Row(
+              //   children: [
+              //     const Icon(
+              //       Icons.person_outline,
+              //       size: 16,
+              //       color: Colors.grey,
+              //     ),
+              //     const SizedBox(width: 8),
+              //     Expanded(
+              //       child: Text(
+              //         supplier.contactPerson,
+              //         style: const TextStyle(
+              //           fontSize: 14,
+              //           color: Colors.black87,
+              //         ),
+              //         maxLines: 1,
+              //         overflow: TextOverflow.ellipsis,
+              //       ),
+              //     ),
+              //   ],
+              // ),
+                                        
               // Botones de acción
               if (onToggleStatus != null || onDelete != null)
                 Row(

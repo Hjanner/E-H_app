@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:ehstore_app/screens/customers/customer_list_screen.dart';
+import 'package:ehstore_app/screens/more/customers/customer_list_screen.dart';
 
 class CustomersScreen extends StatelessWidget {
   const CustomersScreen({super.key});

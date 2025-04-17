@@ -252,8 +252,8 @@ class _SupplierListScreenState extends State<SupplierListScreen> {
             controller: _searchController,
             decoration: InputDecoration(
               hintText: 'Buscar proveedores',
-              hintStyle: TextStyle(color: Colors.grey.shade400),
-              prefixIcon: Icon(Icons.search, color: AppTheme.primaryColor),
+              //hintStyle: TextStyle(color: Colors.grey.shade400),
+              prefixIcon: const Icon(Icons.search, color: AppTheme.primaryColor),
               suffixIcon: _searchQuery.isNotEmpty
                   ? IconButton(
                       icon: const Icon(Icons.clear, color: Colors.grey),
@@ -274,7 +274,7 @@ class _SupplierListScreenState extends State<SupplierListScreen> {
               ),
               focusedBorder: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(12),
-                borderSide: BorderSide(color: AppTheme.primaryColor, width: 1.5),
+                borderSide: const BorderSide(color: AppTheme.primaryColor, width: 1.5),
               ),
               contentPadding: const EdgeInsets.symmetric(vertical: 12, horizontal: 12),
             ),
@@ -336,7 +336,7 @@ class _SupplierListScreenState extends State<SupplierListScreen> {
               color: AppTheme.primaryColor.withOpacity(0.1),
               shape: BoxShape.circle,
             ),
-            child: Icon(
+            child: const Icon(
               Icons.business_outlined,
               size: 70,
               color: AppTheme.primaryColor,
@@ -430,7 +430,7 @@ class _SupplierListScreenState extends State<SupplierListScreen> {
                           const SizedBox(width: 4),
                           Text(
                             _showOnlyActive ? 'Activos' : 'Todos',
-                            style: TextStyle(
+                            style: const TextStyle(
                               fontWeight: FontWeight.w500,
                               color: AppTheme.primaryColor,
                               fontSize: 13,
